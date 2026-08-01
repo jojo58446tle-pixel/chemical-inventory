@@ -171,7 +171,7 @@ async function editStockLot(l){
 }
 
 async function triggerExpiryAlertNow(lotId=null){
-  const response=await fetch("/.netlify/functions/check-expiry-now",{method:"POST",headers:{Authorization:`Bearer ${adminToken}`,"Content-Type":"application/json"},body:JSON.stringify({lot_id:lotId})});
+  const response=await fetch("/.netlify/functions/check-expiry-now",{method:"POST",headers:{Authorization:`Bearer ${adminToken}`,"Content-Type":"application/json","X-Supabase-Key":cfg.SUPABASE_PUBLISHABLE_KEY},body:JSON.stringify({lot_id:lotId})});
   const result=await response.json();
   if(!response.ok||!result.ok)throw new Error(result.error||"ส่งแจ้งเตือนไม่สำเร็จ");
   return result;
