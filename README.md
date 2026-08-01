@@ -37,10 +37,22 @@ Publishable key เป็น Public key สำหรับหน้าเว็�
 เปิด `supabase/login-no-email-migration.sql`
 คัดลอกทั้งหมดไปวางใน Supabase SQL Editor แล้วกด Run
 
+จากนั้นเปิด `supabase/receiving-v1-migration.sql`
+คัดลอกทั้งหมดไปวางใน Supabase SQL Editor แล้วกด Run เพื่อเพิ่ม Receiving Chemical V1
+
 ## 5) Deploy ใหม่
 
 เมื่อ Commit ไฟล์ขึ้น GitHub Netlify จะ Deploy อัตโนมัติ
 
 Login:
-- Username: `admin`
+- Username: `Puk` (หรือตามค่า `ADMIN_USERNAME` ใน Netlify)
 - Password: ค่าที่ตั้งใน `ADMIN_PASSWORD`
+
+## Receiving Chemical V1
+
+- QR แยก 4 ส่วน: Supplier Code, Material Code, Lot, MFG Date
+- Unit ให้ผู้ใช้กรอกเอง
+- Material Code เดิมดึง Material Name, Shelf Life, Storage Condition และแก้ไขได้
+- Material Code ใหม่บันทึก Material Master ได้โดยไม่ใช้ BOM
+- Expiry Date คำนวณจาก MFG Date + Shelf Life
+- ถ้าวันที่ผลิตจาก QR และฉลากสินค้าไม่ตรงกัน ต้องเลือกวันที่ที่จะใช้และระบบบันทึก Log
