@@ -39,3 +39,15 @@
 - Unit
 - Supplier
 - Barcode
+
+
+## Login แบบ Username
+หน้าเว็บใช้ Username + Password เท่านั้น
+
+ตั้งค่า Netlify Environment Variables:
+- ADMIN_USERNAME = admin
+- ADMIN_AUTH_EMAIL = อีเมลของบัญชี Supabase Auth ที่ใช้ตรวจรหัส (ซ่อนอยู่ฝั่ง Backend)
+- SUPABASE_URL = API URL
+- SUPABASE_PUBLISHABLE_KEY = Publishable Key
+
+รหัสผ่านไม่อยู่ในหน้าเว็บและไม่ต้องใส่ใน Netlify Environment Variables

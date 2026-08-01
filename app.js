@@ -18,8 +18,42 @@ async function init(){
 }
 function login(){
   app.innerHTML=`<main class="login"><section class="login-card"><div class="brand">⚗️</div><h1>ระบบคลังสารเคมี</h1><div class="muted">Chemical Inventory System</div>
-  <form id="login" class="stack"><label>อีเมล<input id="email" type="email" required></label><label>รหัสผ่าน<input id="password" type="password" required></label><button class="primary">เข้าสู่ระบบ</button><div id="err" class="error"></div></form></section></main>`;
-  $("#login").onsubmit=async e=>{e.preventDefault();const {error}=await sb.auth.signInWithPassword({email:$("#email").value.trim(),password:$("#password").value});$("#err").textContent=error?"อีเมลหรือรหัสผ่านไม่ถูกต้อง":"";};
+  <form id="login" class="stack">
+    <label>ชื่อผู้ใช้<input id="username" autocomplete="username" required></label>
+    <label>รหัสผ่าน<input id="password" type="password" autocomplete="current-password" required></label>
+    <button class="primary">เข้าสู่ระบบ</button>
+    <div id="err" class="error"></div>
+  </form></section></main>`;
+  $("#login").onsubmit=async e=>{
+    e.preventDefault();
+    const button=$("#login button");
+    const err=$("#err");
+    button.disabled=true;
+    button.textContent="กำลังเข้าสู่ระบบ...";
+    err.textContent="";
+    try{
+      const response=await fetch("/.netlify/functions/login",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          username:$("#username").value.trim(),
+          password:$("#password").value
+        })
+      });
+      const result=await response.json();
+      if(!response.ok||!result.ok) throw new Error(result.error||"Login failed");
+      const {error}=await sb.auth.setSession({
+        access_token:result.access_token,
+        refresh_token:result.refresh_token
+      });
+      if(error) throw error;
+    }catch(error){
+      err.textContent="ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง";
+    }finally{
+      button.disabled=false;
+      button.textContent="เข้าสู่ระบบ";
+    }
+  };
 }
 function mount(){
   app.innerHTML=`<div class="shell"><header class="topbar"><button id="menu" class="icon">☰</button><div class="grow"><b id="title">Dashboard</b><div class="tiny">Admin Warehouse</div></div><button id="logout" class="icon">⎋</button></header><main id="page" class="page"></main>
