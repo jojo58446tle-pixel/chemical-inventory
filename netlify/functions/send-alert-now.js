@@ -1,13 +1,18 @@
 const { createClient } = require("@supabase/supabase-js");
+const jwt = require("jsonwebtoken");
 
 exports.handler = async (event) => {
   try {
     const token = (event.headers.authorization || "").replace("Bearer ", "");
     if (!token) return json(401, { ok:false, error:"Unauthorized" });
 
+    try {
+      jwt.verify(token, process.env.SUPABASE_JWT_SECRET, { algorithms:["HS256"] });
+    } catch (_error) {
+      return json(401, { ok:false, error:"Unauthorized" });
+    }
+
     const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
-    const { data: userData, error: userError } = await supabase.auth.getUser(token);
-    if (userError || !userData.user) return json(401, { ok:false, error:"Unauthorized" });
 
     const today = new Date();
     const limit = new Date(today); limit.setDate(limit.getDate() + 180);

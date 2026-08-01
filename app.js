@@ -1,20 +1,48 @@
 (() => {
 "use strict";
 const cfg = window.APP_CONFIG || {};
-const sb = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_PUBLISHABLE_KEY);
 const app = document.querySelector("#app");
-let session=null;
+const TOKEN_KEY = "chemical_admin_token";
+let adminToken = sessionStorage.getItem(TOKEN_KEY) || "";
+let sb = null;
 const $=(s,e=document)=>e.querySelector(s), $$=(s,e=document)=>[...e.querySelectorAll(s)];
 const esc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
 const fmt=n=>Number(n||0).toLocaleString("th-TH",{maximumFractionDigits:3});
 const today=()=>new Date().toISOString().slice(0,10);
 const daysLeft=d=>Math.ceil((new Date(d+"T23:59:59")-new Date())/86400000);
 
+function tokenIsValid(token){
+  try{
+    const payload=JSON.parse(atob(token.split(".")[1].replace(/-/g,"+").replace(/_/g,"/")));
+    return Number(payload.exp||0)*1000>Date.now()+30000;
+  }catch(_error){
+    return false;
+  }
+}
+
+function createDatabaseClient(token){
+  if(!cfg.SUPABASE_URL || !cfg.SUPABASE_PUBLISHABLE_KEY){
+    throw new Error("ยังไม่ได้ตั้งค่า Supabase ใน config.js");
+  }
+  return window.supabase.createClient(
+    cfg.SUPABASE_URL,
+    cfg.SUPABASE_PUBLISHABLE_KEY,
+    {
+      auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false},
+      global:{headers:{Authorization:`Bearer ${token}`}}
+    }
+  );
+}
+
 async function init(){
-  const {data}=await sb.auth.getSession();
-  session=data.session;
-  session?mount():login();
-  sb.auth.onAuthStateChange((_e,s)=>{session=s;s?mount():login();});
+  if(adminToken && tokenIsValid(adminToken)){
+    sb=createDatabaseClient(adminToken);
+    mount();
+  }else{
+    sessionStorage.removeItem(TOKEN_KEY);
+    adminToken="";
+    login();
+  }
 }
 function login(){
   app.innerHTML=`<main class="login"><section class="login-card"><div class="brand">⚗️</div><h1>ระบบคลังสารเคมี</h1><div class="muted">Chemical Inventory System</div>
@@ -42,11 +70,10 @@ function login(){
       });
       const result=await response.json();
       if(!response.ok||!result.ok) throw new Error(result.error||"Login failed");
-      const {error}=await sb.auth.setSession({
-        access_token:result.access_token,
-        refresh_token:result.refresh_token
-      });
-      if(error) throw error;
+      adminToken=result.access_token;
+      sessionStorage.setItem(TOKEN_KEY,adminToken);
+      sb=createDatabaseClient(adminToken);
+      mount();
     }catch(error){
       err.textContent="ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง";
     }finally{
@@ -58,7 +85,7 @@ function login(){
 function mount(){
   app.innerHTML=`<div class="shell"><header class="topbar"><button id="menu" class="icon">☰</button><div class="grow"><b id="title">Dashboard</b><div class="tiny">Admin Warehouse</div></div><button id="logout" class="icon">⎋</button></header><main id="page" class="page"></main>
   <nav class="bottom"><button data-page="dashboard">⌂<span>หน้าหลัก</span></button><button data-page="receive">⇩<span>รับเข้า</span></button><button data-page="issue">⇧<span>เบิกจ่าย</span></button><button data-page="stock">▣<span>คงคลัง</span></button><button data-page="more">☰<span>เมนู</span></button></nav></div>`;
-  $("#logout").onclick=()=>sb.auth.signOut();$("#menu").onclick=()=>render("more");$$(".bottom button").forEach(b=>b.onclick=()=>render(b.dataset.page));render("dashboard");
+  $("#logout").onclick=()=>{sessionStorage.removeItem(TOKEN_KEY);adminToken="";sb=null;login();};$("#menu").onclick=()=>render("more");$$(".bottom button").forEach(b=>b.onclick=()=>render(b.dataset.page));render("dashboard");
 }
 async function render(name){
   const titles={dashboard:"Dashboard",receive:"รับเข้าสารเคมี",issue:"เบิกจ่ายสารเคมี",stock:"คงคลัง",alerts:"แจ้งเตือน",history:"ประวัติ",report:"รายงาน",more:"เมนู"};
@@ -84,7 +111,7 @@ async function issue(){
   $("#save").onclick=async()=>{const chosen=lots.find(x=>x.id===$("#lot").value),qty=+$("#qty").value,note=$("#note").value.trim();if(!chosen||!(qty>0))return alert("กรอกข้อมูลให้ครบ");if(qty>+chosen.remaining_qty)return alert("จำนวนมากกว่าคงเหลือ");const fifo=chosen.id===lots[0].id;if(!fifo&&!note)return alert("กรุณาระบุเหตุผลเมื่อไม่เลือก Lot FIFO");if(!fifo&&!confirm("Lot นี้ไม่ใช่ Lot แนะนำตาม FIFO ยืนยันต่อหรือไม่?"))return;const {error}=await sb.rpc("issue_stock",{p_lot_id:chosen.id,p_qty:qty,p_note:fifo?"FIFO":`ไม่ตาม FIFO: ${note}`});if(error)throw error;alert("บันทึกเบิกจ่ายแล้ว");render("stock");};
 }
 async function stock(){const lots=(await getLots()).filter(x=>+x.remaining_qty>0);$("#page").innerHTML=`<label>ค้นหา<input id="search" placeholder="Material / Lot"></label><div class="list" style="margin-top:12px">${lots.length?lots.map(l=>`<div class="item s" data-search="${esc(l.materials.material_code)} ${esc(l.materials.material_name)} ${esc(l.lot_no)}"><div class="row"><b>${esc(l.materials.material_code)} — ${esc(l.materials.material_name)}</b><strong>${fmt(l.remaining_qty)} ${esc(l.materials.unit)}</strong></div><div class="muted">Lot ${esc(l.lot_no)} • รับ ${esc(l.received_date)} • Exp ${esc(l.expiry_date)}</div></div>`).join(""):'<div class="card muted">ยังไม่มี Stock</div>'}</div>`;$("#search").oninput=e=>$$(".s").forEach(x=>x.classList.toggle("hidden",!x.dataset.search.toLowerCase().includes(e.target.value.toLowerCase())));}
-async function alerts(){const lots=(await getLots()).filter(x=>+x.remaining_qty>0&&daysLeft(x.expiry_date)<=180).sort((a,b)=>a.expiry_date.localeCompare(b.expiry_date));$("#page").innerHTML=`<div class="actions"><button id="send" class="primary">ส่งเข้า DingTalk ตอนนี้</button></div><div class="list" style="margin-top:12px">${lots.length?lots.map(lotCard).join(""):'<div class="card muted">ไม่มีรายการเข้าเงื่อนไข</div>'}</div>`;$("#send").onclick=async()=>{const {data}=await sb.auth.getSession();const r=await fetch("/.netlify/functions/send-alert-now",{method:"POST",headers:{Authorization:`Bearer ${data.session.access_token}`}});const j=await r.json();alert(j.ok?"ส่ง DingTalk แล้ว":`ส่งไม่สำเร็จ: ${j.error||""}`);};}
+async function alerts(){const lots=(await getLots()).filter(x=>+x.remaining_qty>0&&daysLeft(x.expiry_date)<=180).sort((a,b)=>a.expiry_date.localeCompare(b.expiry_date));$("#page").innerHTML=`<div class="actions"><button id="send" class="primary">ส่งเข้า DingTalk ตอนนี้</button></div><div class="list" style="margin-top:12px">${lots.length?lots.map(lotCard).join(""):'<div class="card muted">ไม่มีรายการเข้าเงื่อนไข</div>'}</div>`;$("#send").onclick=async()=>{const r=await fetch("/.netlify/functions/send-alert-now",{method:"POST",headers:{Authorization:`Bearer ${adminToken}`}});const j=await r.json();alert(j.ok?"ส่ง DingTalk แล้ว":`ส่งไม่สำเร็จ: ${j.error||""}`);};}
 async function history(){const {data,error}=await sb.from("stock_movements").select("*,materials(*),chemical_lots(*)").order("created_at",{ascending:false}).limit(500);if(error)throw error;$("#page").innerHTML=`<div class="list">${(data||[]).map(m=>`<div class="item"><div class="row"><b>${m.movement_type==="IN"?"รับเข้า":"เบิกจ่าย"} ${esc(m.materials?.material_code)}</b><span>${new Date(m.created_at).toLocaleString("th-TH")}</span></div><div>Lot ${esc(m.chemical_lots?.lot_no)} • ${fmt(m.qty)} ${esc(m.materials?.unit)}</div><div class="muted">${esc(m.note||"")}</div></div>`).join("")||'<div class="card muted">ยังไม่มีประวัติ</div>'}</div>`;}
 async function report(){$("#page").innerHTML=`<div class="card form"><h2>Export Excel</h2><div class="muted">Stock, Receiving, Issue และ Expiry Alert</div><button id="export" class="success">📗 Export Excel</button></div>`;$("#export").onclick=exportExcel;}
 async function exportExcel(){const lots=await getLots();const {data:mov,error}=await sb.from("stock_movements").select("*,materials(*),chemical_lots(*)").order("created_at");if(error)throw error;const wb=XLSX.utils.book_new();const stock=lots.map(l=>({Material:l.materials.material_code,Name:l.materials.material_name,Lot:l.lot_no,ReceivedDate:l.received_date,ExpiryDate:l.expiry_date,ReceivedQty:l.received_qty,RemainingQty:l.remaining_qty,Unit:l.materials.unit,Supplier:l.materials.supplier}));const rec=(mov||[]).filter(x=>x.movement_type==="IN").map(mapMov),iss=(mov||[]).filter(x=>x.movement_type==="OUT").map(mapMov),al=lots.filter(x=>+x.remaining_qty>0&&daysLeft(x.expiry_date)<=180).map(l=>({...stock.find(s=>s.Material===l.materials.material_code&&s.Lot===l.lot_no),DaysLeft:daysLeft(l.expiry_date)}));[["Stock",stock],["Receiving",rec],["Issue",iss],["Expiry_Alert",al]].forEach(([n,r])=>XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(r),n));XLSX.writeFile(wb,`Chemical_Inventory_${today()}.xlsx`);}
