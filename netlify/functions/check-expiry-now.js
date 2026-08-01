@@ -14,9 +14,13 @@ exports.handler = async (event) => {
     }
 
     const body = JSON.parse(event.body || "{}");
+    const supabaseUrl = process.env.SUPABASE_URL || "https://eknwvgjftjimurlynfmv.supabase.co";
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!serviceRoleKey) throw new Error("Netlify ยังไม่ได้ตั้งค่า SUPABASE_SERVICE_ROLE_KEY");
+    if (!process.env.DINGTALK_WEBHOOK_URL) throw new Error("Netlify ยังไม่ได้ตั้งค่า DINGTALK_WEBHOOK_URL");
     const supabase = createClient(
-      process.env.SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY,
+      supabaseUrl,
+      serviceRoleKey,
       { auth:{ persistSession:false } }
     );
 
