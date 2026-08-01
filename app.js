@@ -17,10 +17,10 @@ function parseChemicalQr(raw){
   try{const j=JSON.parse(text);return {supplier:j.supplier_code||j.supplier||j.SupplierCode||j.Supplier,code:j.material_code||j.material||j.MaterialCode||j.Material,lot:j.lot||j.lot_no||j.Lot,mfg:j.mfg_date||j.mfg||j.MFGDate||j.MFG};}catch(_error){}
   const result={};
   text.split(/[\n;]+/).forEach(part=>{const p=part.split(/[:=]/);if(p.length<2)return;const k=p.shift().trim().toLowerCase().replace(/[\s_-]/g,""),v=p.join(":").trim();if(/supplier|vendor/.test(k))result.supplier=v;else if(/material|matcode|item/.test(k))result.code=v;else if(/lot|batch/.test(k))result.lot=v;else if(/mfg|manufactur|productiondate/.test(k))result.mfg=v;});
-  if(!result.supplier||!result.code||!result.lot||!result.mfg){const p=text.split(/[|,\t]/).map(x=>x.trim()).filter(Boolean);if(p.length>=4)return {supplier:p[0],code:p[1],lot:p[2],mfg:p[3]};}
+  if(!result.supplier||!result.code||!result.lot||!result.mfg){const p=text.split(/[_|,\t]/).map(x=>x.trim()).filter(Boolean);if(p.length>=4)return {supplier:p[0],code:p[1],lot:p[2],mfg:p[3]};}
   return result.supplier&&result.code&&result.lot&&result.mfg?result:null;
 }
-function normalizeQrDate(value){const v=String(value||"").trim();if(/^\d{4}-\d{2}-\d{2}$/.test(v))return v;let m=v.match(/^(\d{2})[\/-](\d{2})[\/-](\d{4})$/);if(m)return `${m[3]}-${m[2]}-${m[1]}`;m=v.match(/^(\d{4})(\d{2})(\d{2})$/);return m?`${m[1]}-${m[2]}-${m[3]}`:"";}
+function normalizeQrDate(value){const v=String(value||"").trim();if(/^\d{4}-\d{2}-\d{2}$/.test(v))return v;let m=v.match(/^(\d{2})[\/-](\d{2})[\/-](\d{4})$/);if(m)return `${m[3]}-${m[2]}-${m[1]}`;m=v.match(/^(\d{4})(\d{2})(\d{2})$/);if(m)return `${m[1]}-${m[2]}-${m[3]}`;m=v.match(/^(\d{2})(\d{2})(\d{2})$/);return m?`20${m[1]}-${m[2]}-${m[3]}`:"";}
 
 function tokenIsValid(token){
   try{
