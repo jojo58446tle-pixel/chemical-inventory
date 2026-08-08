@@ -144,38 +144,42 @@ async function issue(){
   let lots=[];const lookup=async()=>{const {data,error}=await sb.from("chemical_lots").select("*,materials!inner(*)").eq("materials.material_code",$("#code").value.trim()).eq("is_active",true).gt("remaining_qty",0).order("received_date");if(error)throw error;lots=data||[];$("#lot").innerHTML='<option value="">— เลือก Lot —</option>'+lots.map((l,i)=>`<option value="${l.id}">${i===0?"⭐ FIFO • ":""}${esc(l.lot_no)} • เหลือ ${fmt(l.remaining_qty)} ${esc(l.unit||l.materials.unit)} • รับ ${esc(l.received_date)}</option>`).join("");if(lots[0])$("#lot").value=lots[0].id;$("#fifo").innerHTML=lots.length?`<div class="fifo card"><b>แนะนำ Lot ตาม FIFO: ${esc(lots[0].lot_no)}</b><div>รับเข้าก่อนสุด ${esc(lots[0].received_date)}</div></div>`:"ไม่พบ Stock";};
   $("#code").onchange=lookup;$("#scan").onclick=()=>scan("reader",v=>{$("#code").value=v;lookup();});
   $("#save").onclick=async()=>{
-    const button=$("#save");
+    const chosen=lots.find(x=>x.id===$("#lot").value),qty=+$("#qty").value,note=$("#note").value.trim();
+    if(!chosen||!(qty>0))return alert("กรอกข้อมูลให้ครบ");
+    if(qty>+chosen.remaining_qty)return alert("จำนวนมากกว่าคงเหลือ");
+    const fifo=chosen.id===lots[0].id;
+    if(!fifo&&!note)return alert("กรุณาระบุเหตุผลเมื่อไม่เลือก Lot FIFO");
+    if(!fifo&&!confirm("Lot นี้ไม่ใช่ Lot แนะนำตาม FIFO ยืนยันต่อหรือไม่?"))return;
+    const button=$("#save"),originalText=button.textContent,moveNote=fifo?"FIFO":`ไม่ตาม FIFO: ${note}`;
+    button.disabled=true;button.textContent="กำลังบันทึก...";
     try{
-      const chosen=lots.find(x=>x.id===$("#lot").value),qty=+$("#qty").value,note=$("#note").value.trim();
-      if(!chosen||!(qty>0))return alert("กรอกข้อมูลให้ครบ");
-      if(qty>+chosen.remaining_qty)return alert("จำนวนมากกว่าคงเหลือ");
-      const fifo=chosen.id===lots[0].id;
-      if(!fifo&&!note)return alert("กรุณาระบุเหตุผลเมื่อไม่เลือก Lot FIFO");
-      if(!fifo&&!confirm("Lot นี้ไม่ใช่ Lot แนะนำตาม FIFO ยืนยันต่อหรือไม่?"))return;
-      button.disabled=true;
-      button.textContent="กำลังบันทึก...";
-      const response=await fetch("/.netlify/functions/issue-stock",{
-        method:"POST",
-        headers:{
-          "Content-Type":"application/json",
-          "Authorization":`Bearer ${adminToken}`,
-          "X-Supabase-Key":cfg.SUPABASE_PUBLISHABLE_KEY
-        },
-        body:JSON.stringify({lot_id:chosen.id,qty,note:fifo?"FIFO":`ไม่ตาม FIFO: ${note}`})
-      });
-      let result={};
-      try{result=await response.json();}catch(_error){}
-      if(!response.ok||!result.ok)throw new Error(result.error||`HTTP ${response.status}`);
-      alert(`บันทึกเบิกจ่ายแล้ว\nคงเหลือ ${fmt(result.remaining_qty)} ${chosen.unit||chosen.materials.unit}`);
-      render("stock");
-    }catch(e){
-      console.error("Issue stock failed",e);
-      alert(`บันทึกเบิกจ่ายไม่สำเร็จ: ${e.message}`);
-    }finally{
-      if(button&&document.body.contains(button)){
-        button.disabled=false;
-        button.textContent="บันทึกเบิกจ่าย";
+      // ใช้ RPC เดิมก่อน เพื่อรักษา flow ของโปรเจกต์ Work ไว้เหมือนเดิม
+      const rpcResult=await sb.rpc("issue_stock",{p_lot_id:chosen.id,p_qty:qty,p_note:moveNote});
+      if(rpcResult.error){
+        console.warn("issue_stock RPC failed; using safe authenticated fallback",rpcResult.error);
+        // Fallback ใช้ Supabase client เดิม + JWT เดิมจากหน้าเว็บ ไม่ต้องเพิ่ม ENV/Function/SQL
+        const {data:fresh,error:freshError}=await sb.from("chemical_lots").select("id,material_id,remaining_qty").eq("id",chosen.id).single();
+        if(freshError)throw freshError;
+        const before=Number(fresh.remaining_qty||0);
+        if(qty>before)throw new Error("จำนวนมากกว่าคงเหลือปัจจุบัน");
+        const after=Number((before-qty).toFixed(3));
+        const {data:updated,error:updateError}=await sb.from("chemical_lots").update({remaining_qty:after}).eq("id",chosen.id).eq("remaining_qty",before).select("id,remaining_qty");
+        if(updateError)throw updateError;
+        if(!updated||updated.length!==1)throw new Error("Stock มีการเปลี่ยนแปลงจากอุปกรณ์อื่น กรุณาลองใหม่");
+        const {error:moveError}=await sb.from("stock_movements").insert({movement_type:"OUT",material_id:fresh.material_id,lot_id:chosen.id,qty:qty,note:moveNote,performed_by:null});
+        if(moveError){
+          const {error:rollbackError}=await sb.from("chemical_lots").update({remaining_qty:before}).eq("id",chosen.id).eq("remaining_qty",after);
+          if(rollbackError)console.error("Stock rollback failed",rollbackError);
+          throw moveError;
+        }
       }
+      alert("บันทึกเบิกจ่ายแล้ว");
+      render("stock");
+    }catch(error){
+      console.error("Issue stock failed",error);
+      alert(`บันทึกเบิกจ่ายไม่สำเร็จ: ${error?.message||"เกิดข้อผิดพลาด"}`);
+    }finally{
+      button.disabled=false;button.textContent=originalText;
     }
   };
 }
