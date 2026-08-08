@@ -152,20 +152,16 @@ async function issue(){
       const fifo=chosen.id===lots[0].id;
       if(!fifo&&!note)return alert("กรุณาระบุเหตุผลเมื่อไม่เลือก Lot FIFO");
       if(!fifo&&!confirm("Lot นี้ไม่ใช่ Lot แนะนำตาม FIFO ยืนยันต่อหรือไม่?"))return;
-
       button.disabled=true;
       button.textContent="กำลังบันทึก...";
       const response=await fetch("/.netlify/functions/issue-stock",{
         method:"POST",
         headers:{
           "Content-Type":"application/json",
-          "Authorization":`Bearer ${adminToken}`
+          "Authorization":`Bearer ${adminToken}`,
+          "X-Supabase-Key":cfg.SUPABASE_PUBLISHABLE_KEY
         },
-        body:JSON.stringify({
-          lot_id:chosen.id,
-          qty,
-          note:fifo?"FIFO":`ไม่ตาม FIFO: ${note}`
-        })
+        body:JSON.stringify({lot_id:chosen.id,qty,note:fifo?"FIFO":`ไม่ตาม FIFO: ${note}`})
       });
       let result={};
       try{result=await response.json();}catch(_error){}

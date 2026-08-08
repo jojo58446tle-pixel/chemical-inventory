@@ -57,13 +57,10 @@ Login:
 - Expiry Date คำนวณจาก MFG Date + Shelf Life
 - ถ้าวันที่ผลิตจาก QR และฉลากสินค้าไม่ตรงกัน ต้องเลือกวันที่ที่จะใช้และระบบบันทึก Log
 
-## Permanent issue-stock fix
 
-The Issue Stock screen now writes through `/.netlify/functions/issue-stock` using the existing Netlify service-role connection. This avoids the old `auth.users` foreign-key problem caused by the custom Username/Password JWT and does not require running `login-no-email-migration.sql` for each issue transaction.
-
-Required Netlify environment variables (already used elsewhere in this project):
-- `SUPABASE_URL`
-- `SUPABASE_SERVICE_ROLE_KEY`
-- `SUPABASE_JWT_SECRET`
-
-The UI now shows a real error message instead of silently failing, prevents double-submit while saving, and reports the remaining quantity after success.
+## FIX 2026-08-08 — Issue Stock permanent fix v2
+- ไม่ต้องตั้ง SUPABASE_SERVICE_ROLE_KEY
+- ไม่ต้องรัน SQL migration เพิ่มเพื่อให้ปุ่มเบิกทำงาน
+- ใช้ Admin JWT + SUPABASE_PUBLISHABLE_KEY ที่ระบบมีอยู่แล้ว
+- issue-stock Netlify Function ตัด stock และบันทึก movement โดย performed_by = null
+- แสดง error บนหน้าจอแทนการกดแล้วเงียบ
