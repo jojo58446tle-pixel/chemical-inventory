@@ -56,3 +56,14 @@ Login:
 - Material Code ใหม่บันทึก Material Master ได้โดยไม่ใช้ BOM
 - Expiry Date คำนวณจาก MFG Date + Shelf Life
 - ถ้าวันที่ผลิตจาก QR และฉลากสินค้าไม่ตรงกัน ต้องเลือกวันที่ที่จะใช้และระบบบันทึก Log
+
+## Permanent issue-stock fix
+
+The Issue Stock screen now writes through `/.netlify/functions/issue-stock` using the existing Netlify service-role connection. This avoids the old `auth.users` foreign-key problem caused by the custom Username/Password JWT and does not require running `login-no-email-migration.sql` for each issue transaction.
+
+Required Netlify environment variables (already used elsewhere in this project):
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `SUPABASE_JWT_SECRET`
+
+The UI now shows a real error message instead of silently failing, prevents double-submit while saving, and reports the remaining quantity after success.

@@ -143,7 +143,45 @@ async function issue(){
   $("#page").innerHTML=`<div class="form"><div class="scanner"><b>สแกนบาร์โค้ด</b><button id="scan" class="secondary">เปิดกล้องสแกน</button><div id="reader"></div></div><label>Material Code<input id="code"></label><div id="fifo" class="card muted">ระบบจะแนะนำ Lot ตาม FIFO</div><label>เลือก Lot<select id="lot"><option value="">—</option></select></label><label>จำนวนเบิก<input id="qty" type="number" min="0.001" step="0.001"></label><label>เหตุผลกรณีเปลี่ยน Lot<input id="note"></label><button id="save" class="success">บันทึกเบิกจ่าย</button></div>`;
   let lots=[];const lookup=async()=>{const {data,error}=await sb.from("chemical_lots").select("*,materials!inner(*)").eq("materials.material_code",$("#code").value.trim()).eq("is_active",true).gt("remaining_qty",0).order("received_date");if(error)throw error;lots=data||[];$("#lot").innerHTML='<option value="">— เลือก Lot —</option>'+lots.map((l,i)=>`<option value="${l.id}">${i===0?"⭐ FIFO • ":""}${esc(l.lot_no)} • เหลือ ${fmt(l.remaining_qty)} ${esc(l.unit||l.materials.unit)} • รับ ${esc(l.received_date)}</option>`).join("");if(lots[0])$("#lot").value=lots[0].id;$("#fifo").innerHTML=lots.length?`<div class="fifo card"><b>แนะนำ Lot ตาม FIFO: ${esc(lots[0].lot_no)}</b><div>รับเข้าก่อนสุด ${esc(lots[0].received_date)}</div></div>`:"ไม่พบ Stock";};
   $("#code").onchange=lookup;$("#scan").onclick=()=>scan("reader",v=>{$("#code").value=v;lookup();});
-  $("#save").onclick=async()=>{const chosen=lots.find(x=>x.id===$("#lot").value),qty=+$("#qty").value,note=$("#note").value.trim();if(!chosen||!(qty>0))return alert("กรอกข้อมูลให้ครบ");if(qty>+chosen.remaining_qty)return alert("จำนวนมากกว่าคงเหลือ");const fifo=chosen.id===lots[0].id;if(!fifo&&!note)return alert("กรุณาระบุเหตุผลเมื่อไม่เลือก Lot FIFO");if(!fifo&&!confirm("Lot นี้ไม่ใช่ Lot แนะนำตาม FIFO ยืนยันต่อหรือไม่?"))return;const {error}=await sb.rpc("issue_stock",{p_lot_id:chosen.id,p_qty:qty,p_note:fifo?"FIFO":`ไม่ตาม FIFO: ${note}`});if(error)throw error;alert("บันทึกเบิกจ่ายแล้ว");render("stock");};
+  $("#save").onclick=async()=>{
+    const button=$("#save");
+    try{
+      const chosen=lots.find(x=>x.id===$("#lot").value),qty=+$("#qty").value,note=$("#note").value.trim();
+      if(!chosen||!(qty>0))return alert("กรอกข้อมูลให้ครบ");
+      if(qty>+chosen.remaining_qty)return alert("จำนวนมากกว่าคงเหลือ");
+      const fifo=chosen.id===lots[0].id;
+      if(!fifo&&!note)return alert("กรุณาระบุเหตุผลเมื่อไม่เลือก Lot FIFO");
+      if(!fifo&&!confirm("Lot นี้ไม่ใช่ Lot แนะนำตาม FIFO ยืนยันต่อหรือไม่?"))return;
+
+      button.disabled=true;
+      button.textContent="กำลังบันทึก...";
+      const response=await fetch("/.netlify/functions/issue-stock",{
+        method:"POST",
+        headers:{
+          "Content-Type":"application/json",
+          "Authorization":`Bearer ${adminToken}`
+        },
+        body:JSON.stringify({
+          lot_id:chosen.id,
+          qty,
+          note:fifo?"FIFO":`ไม่ตาม FIFO: ${note}`
+        })
+      });
+      let result={};
+      try{result=await response.json();}catch(_error){}
+      if(!response.ok||!result.ok)throw new Error(result.error||`HTTP ${response.status}`);
+      alert(`บันทึกเบิกจ่ายแล้ว\nคงเหลือ ${fmt(result.remaining_qty)} ${chosen.unit||chosen.materials.unit}`);
+      render("stock");
+    }catch(e){
+      console.error("Issue stock failed",e);
+      alert(`บันทึกเบิกจ่ายไม่สำเร็จ: ${e.message}`);
+    }finally{
+      if(button&&document.body.contains(button)){
+        button.disabled=false;
+        button.textContent="บันทึกเบิกจ่าย";
+      }
+    }
+  };
 }
 async function stock(){const lots=(await getLots()).filter(x=>+x.remaining_qty>0);$("#page").innerHTML=`<label>ค้นหา<input id="search" placeholder="Material / Lot"></label><div class="list" style="margin-top:12px">${lots.length?lots.map(l=>`<div class="item s" data-search="${esc(l.materials.material_code)} ${esc(l.materials.material_name)} ${esc(l.lot_no)}"><div class="row"><b>${esc(l.materials.material_code)} — ${esc(l.materials.material_name)}</b><strong>${fmt(l.remaining_qty)} ${esc(l.unit||l.materials.unit)}</strong></div><div class="muted">Lot ${esc(l.lot_no)} • รับ ${esc(l.received_date)} • Exp ${esc(l.expiry_date)}</div><div class="lot-actions"><button class="secondary edit-lot" data-id="${l.id}">แก้ไข</button><button class="danger cancel-lot" data-id="${l.id}">ลบรายการ</button></div></div>`).join(""):'<div class="card muted">ยังไม่มี Stock</div>'}</div>`;$("#search").oninput=e=>$$(".s").forEach(x=>x.classList.toggle("hidden",!x.dataset.search.toLowerCase().includes(e.target.value.toLowerCase())));$$('.edit-lot').forEach(b=>b.onclick=()=>editStockLot(lots.find(x=>x.id===b.dataset.id)));$$('.cancel-lot').forEach(b=>b.onclick=()=>cancelStockLot(lots.find(x=>x.id===b.dataset.id)));}
 
