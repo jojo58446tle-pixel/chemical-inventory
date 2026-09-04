@@ -94,3 +94,25 @@ If the production database has already been migrated and validated, **do not rer
 - Chemical Movement History
 
 Version: **1.0.0**
+
+
+## UI Refinement V1.1
+- Split-screen production login based on supplied reference style.
+- Dashboard title updated to Material Shelf-Life & Storage Control System / ระบบควบคุมอายุการเก็บรักษาและการจัดเก็บวัสดุ.
+- Dashboard simplified; General Material Flow and Database Validation cards removed.
+- Sidebar simplified with collapsible Chemical Inventory and Reports & System groups.
+- Existing General Material, Chemical, Supabase, Netlify Function and DingTalk logic preserved.
+
+## V1.2 - General Material Manual DingTalk Alert
+Warehouse Check now supports manual escalation to DingTalk after Material Code + MFG Date verification.
+
+Flow:
+Material Code -> Storage Profile -> MFG Date -> Expiry Status -> Warehouse Remark -> Notify DingTalk.
+
+Required Netlify environment variable:
+- `DINGTALK_MATERIAL_WEBHOOK_URL` = recommended dedicated DingTalk workflow/webhook for General Material alerts.
+
+Fallback:
+- If `DINGTALK_MATERIAL_WEBHOOK_URL` is not set, the function will use the existing `DINGTALK_WEBHOOK_URL`.
+
+The General Material alert does NOT create stock, receiving, or WMS transactions.

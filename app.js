@@ -147,22 +147,58 @@ async function init(){
 }
 function login(){
   document.title="Material Shelf-Life & Storage Control System";
-  app.innerHTML=`<main class="login"><section class="login-card msl-login"><div class="brand-box">◇</div><div class="eyebrow">MATERIAL CONTROL</div><h1>Material Shelf-Life & Storage Control System</h1><div class="muted">ระบบตรวจสอบอายุการจัดเก็บและเงื่อนไขการจัดเก็บวัสดุ</div>
-  <form id="login" class="stack">
-    <label>ชื่อผู้ใช้<input id="username" autocomplete="username" required></label>
-    <label>รหัสผ่าน<input id="password" type="password" autocomplete="current-password" required></label>
-    <button class="primary">เข้าสู่ระบบ</button>
-    <div id="err" class="error"></div>
-  </form><div class="login-foot">Chemical Inventory + General Material Verification</div></section></main>`;
+  app.innerHTML=`<main class="login login-split">
+    <section class="login-showcase" aria-label="Material Shelf-Life & Storage Control System">
+      <div class="login-showcase-inner">
+        <div class="login-logo">MSL</div>
+        <div class="login-message">
+          <div class="login-kicker">MATERIAL CONTROL</div>
+          <h1>Material Shelf-Life<br>&amp; Storage Control<br>System.</h1>
+          <p>ระบบควบคุมอายุการเก็บรักษาและการจัดเก็บวัสดุ</p>
+        </div>
+        <div class="login-steps" aria-label="System process">
+          <span>SEARCH</span><i></i><span>VERIFY</span><i></i><span>CONTROL</span>
+        </div>
+      </div>
+    </section>
+    <section class="login-access">
+      <div class="login-access-card">
+        <div class="login-access-kicker">SECURE ACCESS</div>
+        <h2>Sign in to system</h2>
+        <p class="login-access-copy">เข้าสู่ระบบเพื่อใช้งาน Material Shelf-Life &amp; Storage Control System</p>
+        <form id="login" class="login-form">
+          <label>Username
+            <input id="username" autocomplete="username" placeholder="Enter username" required>
+          </label>
+          <label>Password
+            <div class="password-control">
+              <input id="password" type="password" autocomplete="current-password" placeholder="Enter password" required>
+              <button id="togglePassword" type="button" class="password-toggle" aria-label="แสดงรหัสผ่าน">Show</button>
+            </div>
+          </label>
+          <button id="loginSubmit" class="login-submit" type="submit">Continue to System <span>→</span></button>
+          <div id="err" class="login-error" role="alert"></div>
+        </form>
+        <div class="login-status"><span class="status-light"></span>Production mode · Secure server-side authentication</div>
+        <div class="login-reference">TH-MM-R-007-2025</div>
+      </div>
+    </section>
+  </main>`;
+  $("#togglePassword").onclick=()=>{
+    const input=$("#password"),show=input.type==="password";
+    input.type=show?"text":"password";
+    $("#togglePassword").textContent=show?"Hide":"Show";
+    $("#togglePassword").setAttribute("aria-label",show?"ซ่อนรหัสผ่าน":"แสดงรหัสผ่าน");
+  };
   $("#login").onsubmit=async e=>{
     e.preventDefault();
-    const button=$("#login button");const err=$("#err");button.disabled=true;button.textContent="กำลังเข้าสู่ระบบ...";err.textContent="";
+    const button=$("#loginSubmit");const err=$("#err");button.disabled=true;button.innerHTML="กำลังเข้าสู่ระบบ...";err.textContent="";
     try{
       const response=await fetch("/.netlify/functions/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:$("#username").value.trim(),password:$("#password").value})});
       const result=await response.json();if(!response.ok||!result.ok)throw new Error(result.error||"Login failed");
       adminToken=result.access_token;sessionStorage.setItem(TOKEN_KEY,adminToken);sb=createDatabaseClient(adminToken);mount();
     }catch(error){console.error(error);err.textContent="ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง";}
-    finally{button.disabled=false;button.textContent="เข้าสู่ระบบ";}
+    finally{button.disabled=false;button.innerHTML='Continue to System <span>→</span>';}
   };
 }
 function mount(){
@@ -170,40 +206,57 @@ function mount(){
   app.innerHTML=`<div class="system-shell">
     <header class="system-header">
       <button id="mobileMenu" class="header-menu" aria-label="เปิดเมนู">☰</button>
-      <div class="header-mark">◇</div>
-      <div class="header-title"><b>Material Shelf-Life & Storage Control System</b><span>ระบบตรวจสอบอายุการจัดเก็บและเงื่อนไขการจัดเก็บวัสดุ</span></div>
+      <div class="header-mark">M</div>
+      <div class="header-title"><b>Material Shelf-Life &amp; Storage Control System</b><span>ระบบควบคุมอายุการเก็บรักษาและการจัดเก็บวัสดุ</span></div>
       <div class="header-ref">TH-MM-R-007-2025</div>
       <button class="header-icon" data-page="alerts" title="Expiry Alert">♢</button>
       <button class="profile-button" data-page="settings" title="Settings">A</button>
     </header>
     <div class="system-body">
       <aside class="sidebar">
-        <nav class="side-nav">
+        <div class="sidebar-brand">
+          <span class="sidebar-brand-mark">M</span>
+          <div><b>Material Control</b><small>Production System</small></div>
+        </div>
+        <nav class="side-nav primary-nav" aria-label="Main navigation">
           <button data-page="dashboard">${navIcon("dashboard")}<span>Dashboard</span></button>
           <button data-page="lookup">${navIcon("lookup")}<span>Search / Lookup</span></button>
           <button data-page="incoming">${navIcon("incoming")}<span>Incoming Check</span></button>
           <button data-page="warehouse">${navIcon("warehouse")}<span>Warehouse Check</span></button>
           <button data-page="alerts">${navIcon("alerts")}<span>Expiry Alert</span></button>
-          <button data-page="report">${navIcon("report")}<span>Reports</span></button>
-          <button data-page="master">${navIcon("master")}<span>Master Data</span></button>
-          <button data-page="settings">${navIcon("settings")}<span>Settings</span></button>
         </nav>
-        <div class="side-section-title">CHEMICAL INVENTORY</div>
-        <nav class="side-nav compact-nav">
-          <button data-page="receive">${navIcon("receive")}<span>Receiving</span></button>
-          <button data-page="issue">${navIcon("issue")}<span>Issue</span></button>
-          <button data-page="stock">${navIcon("stock")}<span>Stock</span></button>
-          <button data-page="history">${navIcon("history")}<span>Movement History</span></button>
-        </nav>
-        <div class="master-reference"><b>* อ้างอิงข้อมูลจาก Master</b><span>ห้ามแก้ไขโดยผู้ใช้ทั่วไป</span></div>
+
+        <details class="nav-group" id="chemicalNav">
+          <summary><span class="nav-group-icon">⚗</span><span>Chemical Inventory</span><i>⌄</i></summary>
+          <nav class="side-nav nested-nav">
+            <button data-page="receive">${navIcon("receive")}<span>Receiving</span></button>
+            <button data-page="issue">${navIcon("issue")}<span>Issue</span></button>
+            <button data-page="stock">${navIcon("stock")}<span>Stock</span></button>
+            <button data-page="history">${navIcon("history")}<span>Movement History</span></button>
+          </nav>
+        </details>
+
+        <details class="nav-group" id="systemNav">
+          <summary><span class="nav-group-icon">☷</span><span>Reports &amp; System</span><i>⌄</i></summary>
+          <nav class="side-nav nested-nav">
+            <button data-page="report">${navIcon("report")}<span>Reports</span></button>
+            <button data-page="master">${navIcon("master")}<span>Master Data</span></button>
+            <button data-page="settings">${navIcon("settings")}<span>Settings</span></button>
+          </nav>
+        </details>
+
+        <div class="master-reference"><b>Master Data</b><span>Read-only for normal users</span></div>
       </aside>
       <div class="nav-overlay"></div>
       <main class="content-shell">
-        <div class="page-heading"><div><span class="eyebrow" id="sectionLabel">MATERIAL CONTROL</span><h1 id="title">Dashboard</h1></div><div class="page-badge">PRODUCTION</div></div>
+        <div class="page-heading">
+          <div class="page-heading-copy"><span class="eyebrow" id="sectionLabel">MATERIAL CONTROL</span><h1 id="title">Dashboard</h1><p id="pageSubtitle"></p></div>
+          <div class="page-badge">PRODUCTION</div>
+        </div>
         <section id="page" class="page"></section>
       </main>
     </div>
-    <footer class="system-footer"><span>Material Shelf-Life & Storage Control System</span><span>Version 1.0.0</span></footer>
+    <footer class="system-footer"><span>Material Shelf-Life &amp; Storage Control System</span><span>Version 1.1 UI Refined</span></footer>
   </div>`;
   $("#mobileMenu").onclick=()=>{$(".sidebar").classList.toggle("open");$(".nav-overlay").classList.toggle("show");};
   $(".nav-overlay").onclick=closeMobileNav;
@@ -211,10 +264,13 @@ function mount(){
   render("dashboard");
 }
 async function render(name){
-  const titles={dashboard:"Dashboard",lookup:"Search / Lookup",incoming:"Incoming Check",warehouse:"Warehouse Check",alerts:"Expiry Alert",report:"Reports",master:"Master Data",settings:"Settings",receive:"Chemical Receiving",issue:"Chemical Issue",stock:"Chemical Stock",history:"Chemical Movement History",more:"Chemical Tools"};
+  const titles={dashboard:"Material Shelf-Life & Storage Control System",lookup:"Search / Lookup",incoming:"Incoming Check",warehouse:"Warehouse Check",alerts:"Expiry Alert",report:"Reports",master:"Master Data",settings:"Settings",receive:"Chemical Receiving",issue:"Chemical Issue",stock:"Chemical Stock",history:"Chemical Movement History",more:"Chemical Tools"};
   const section=["receive","issue","stock","history","more"].includes(name)?"CHEMICAL INVENTORY":"MATERIAL CONTROL";
   $("#title").textContent=titles[name]||name;$("#sectionLabel").textContent=section;
+  $("#pageSubtitle").textContent=name==="dashboard"?"ระบบควบคุมอายุการเก็บรักษาและการจัดเก็บวัสดุ":"";
   $$(".side-nav button").forEach(b=>b.classList.toggle("active",b.dataset.page===name));
+  if(["receive","issue","stock","history"].includes(name))$("#chemicalNav").open=true;
+  if(["report","master","settings"].includes(name))$("#systemNav").open=true;
   $("#page").innerHTML='<div class="loading"><span class="spinner"></span>กำลังโหลด...</div>';
   try{await ({dashboard,lookup,incoming,warehouse,alerts,report,master:masterData,settings,receive,issue,stock,history,more}[name]||dashboard)();}
   catch(e){console.error(e);$("#page").innerHTML=`<div class="panel error-panel"><b>ไม่สามารถโหลดข้อมูลได้</b><div>${esc(e.message)}</div></div>`;}
@@ -225,21 +281,43 @@ async function dashboard(){
   const [counts,lots]=await Promise.all([getMslCounts(),getLots()]);
   const active=lots.filter(x=>+x.remaining_qty>0),near=active.filter(x=>daysLeft(x.expiry_date)<=180&&daysLeft(x.expiry_date)>=0),expired=active.filter(x=>daysLeft(x.expiry_date)<0);
   $("#page").innerHTML=`
-    <div class="hero-strip"><div><span class="eyebrow">PRODUCTION DATABASE READY</span><h2>Material Shelf-Life & Storage Control</h2><p>General Material ใช้ Lookup / Verification เท่านั้น ส่วน Chemical ยังคง Receiving, Stock, Issue และ DingTalk Alert เดิม</p></div><button class="primary" data-go="lookup">ค้นหา Material</button></div>
-    <div class="metric-grid">
-      <div class="metric-card"><span>Material Codes</span><b>${fmt(counts.codes)}</b><small>General Material Mapping</small></div>
-      <div class="metric-card"><span>Material Groups</span><b>${fmt(counts.groups)}</b><small>Shelf-Life Master</small></div>
-      <div class="metric-card"><span>Storage Profiles</span><b>${fmt(counts.profiles)}</b><small>รองรับหลาย Profile</small></div>
-      <div class="metric-card ${counts.issues?"attention":""}"><span>Open Data Issues</span><b>${fmt(counts.issues)}</b><small>ไม่เดาข้อมูลที่ขาด</small></div>
+    <section class="dashboard-overview">
+      <div class="overview-copy"><span class="overview-label">SYSTEM OVERVIEW</span><h2>ตรวจสอบข้อมูลวัสดุได้จากจุดเดียว</h2><p>ค้นหา Material Code เพื่อดู Shelf Life, Storage Condition และสถานะการหมดอายุจาก Production Master</p></div>
+      <button class="primary overview-action" data-go="lookup">ค้นหา Material <span>→</span></button>
+    </section>
+
+    <div class="dashboard-metrics-clean">
+      <article class="dashboard-stat"><span class="stat-icon">▣</span><div><small>Material Codes</small><b>${fmt(counts.codes)}</b><p>Mapped in Production Master</p></div></article>
+      <article class="dashboard-stat"><span class="stat-icon">☷</span><div><small>Material Groups</small><b>${fmt(counts.groups)}</b><p>Shelf-Life &amp; Storage Master</p></div></article>
+      <article class="dashboard-stat ${counts.issues?"needs-attention":""}"><span class="stat-icon">!</span><div><small>Data Attention</small><b>${fmt(counts.issues)}</b><p>${counts.issues?"รายการที่ต้องตรวจสอบ Master":"Master data ready"}</p></div></article>
     </div>
-    <div class="dashboard-columns">
-      <section class="panel"><div class="panel-head"><div><span class="panel-icon">⌕</span><b>Quick Material Lookup</b></div></div><div class="search-inline"><input id="dashCode" placeholder="Material Code เช่น SD000197"><button id="dashSearch" class="primary">Search</button></div><p class="helper">ค้นหา Group, Shelf Life, Temperature, Humidity, Packaging และ Remark จาก Production Master</p></section>
-      <section class="panel"><div class="panel-head"><div><span class="panel-icon">⚗</span><b>Chemical Inventory Status</b></div><button class="link-btn" data-go="stock">View Stock</button></div><div class="mini-metrics"><div><span>Active Lots</span><b>${fmt(active.length)}</b></div><div><span>Expiring ≤ 180d</span><b>${fmt(near.length)}</b></div><div><span>Expired</span><b>${fmt(expired.length)}</b></div></div></section>
+
+    <div class="dashboard-main-grid">
+      <section class="panel quick-lookup-panel">
+        <div class="panel-head"><div><span class="panel-icon">⌕</span><b>Quick Material Lookup</b></div><span class="chip">GENERAL MATERIAL</span></div>
+        <div class="search-inline"><input id="dashCode" placeholder="กรอก Material Code เช่น SD000197" autocomplete="off"><button id="dashSearch" class="primary">Search</button></div>
+        <p class="helper">ระบบจะแสดง Material Group, Shelf Life, Temperature, Humidity, Packaging และ Remark จาก Master</p>
+      </section>
+
+      <section class="panel chemical-status-panel">
+        <div class="panel-head"><div><span class="panel-icon">⚗</span><b>Chemical Inventory</b></div><button class="link-btn" data-go="stock">View Stock</button></div>
+        <div class="chemical-status-list">
+          <div><span><i class="status-dot active"></i>Active Lots</span><b>${fmt(active.length)}</b></div>
+          <div><span><i class="status-dot near"></i>Expiring ≤ 180 Days</span><b>${fmt(near.length)}</b></div>
+          <div><span><i class="status-dot expired"></i>Expired</span><b>${fmt(expired.length)}</b></div>
+        </div>
+      </section>
     </div>
-    <div class="dashboard-columns">
-      <section class="panel"><div class="panel-head"><div><span class="panel-icon">▣</span><b>General Material Flow</b></div></div><div class="flow-line"><span>Material Code</span><i>→</i><span>Material Group</span><i>→</i><span>Storage Profile</span><i>→</i><span>Expiry Check</span><i>→</i><span>Warehouse Guidance</span></div><div class="notice info"><b>No duplicate WMS transaction</b><span>General Material ไม่สร้าง Stock / Receiving transaction เพิ่ม</span></div></section>
-      <section class="panel"><div class="panel-head"><div><span class="panel-icon">✓</span><b>Database Validation</b></div></div><div class="check-list"><span>✓ Material Code → Group</span><span>✓ Multiple Storage Profile protection</span><span>✓ Unknown code returns Not Found</span><span>✓ Chemical tables preserved</span></div></section>
-    </div>`;
+
+    <section class="quick-actions-panel">
+      <div class="quick-actions-title"><b>Quick Actions</b><span>เข้าถึงงานหลักได้เร็วขึ้น</span></div>
+      <div class="quick-actions-grid">
+        <button data-go="lookup"><span>⌕</span><b>Search</b><small>ค้นหาข้อมูลวัสดุ</small></button>
+        <button data-go="incoming"><span>▣</span><b>Incoming Check</b><small>ตรวจสอบก่อนรับเข้า</small></button>
+        <button data-go="warehouse"><span>▤</span><b>Warehouse Check</b><small>ตรวจเงื่อนไขจัดเก็บ</small></button>
+        <button data-go="alerts"><span>♢</span><b>Expiry Alert</b><small>ติดตามสถานะหมดอายุ</small></button>
+      </div>
+    </section>`;
   bindGo();
   $("#dashSearch").onclick=()=>{const value=$("#dashCode").value.trim();if(!value)return;pendingLookup={type:"code",value};render("lookup");};
   $("#dashCode").onkeydown=e=>{if(e.key==="Enter")$("#dashSearch").click();};
@@ -416,11 +494,68 @@ async function incoming(){
   $("#incomingCheck").onclick=run;$("#incomingCode").onkeydown=e=>{if(e.key==="Enter")run();};
 }
 
+async function notifyGeneralMaterialDingTalk(payload){
+  const response=await fetch("/.netlify/functions/notify-general-material",{
+    method:"POST",
+    headers:{Authorization:`Bearer ${adminToken}`,"Content-Type":"application/json"},
+    body:JSON.stringify(payload)
+  });
+  const result=await response.json().catch(()=>({}));
+  if(!response.ok||!result.ok)throw new Error(result.error||`HTTP ${response.status}`);
+  return result;
+}
+
 async function warehouse(){
   const {data:rules,error}=await sb.from("msl_warehouse_rules").select("rule_code,clause,title_th,action_text").eq("is_active",true).order("rule_code");if(error)throw error;
-  $("#page").innerHTML=`<div class="page-intro"><div><h2>Warehouse Check</h2><p>ใช้เป็นจุด Lookup / Verification ขณะรับ จัดเก็บ หรือหยิบใช้งาน ไม่ต้องเดินตรวจทุก Code และไม่เพิ่มงาน WMS</p></div></div><div class="dashboard-columns"><section class="panel"><div class="panel-head"><div><span class="panel-icon">⌕</span><b>Material Storage Check</b></div></div><div class="search-inline"><input id="whCode" placeholder="Material Code"><button id="whCheck" class="primary">Check</button></div><div id="whResult" class="result-space"><div class="empty-state">ค้นหา Material Code เพื่อดู Storage Requirement</div></div></section><section class="panel"><div class="panel-head"><div><span class="panel-icon">▤</span><b>Warehouse General Rules</b></div><span class="chip">${fmt((rules||[]).length)} Rules</span></div><div class="rule-list">${(rules||[]).map(x=>`<div><b>${esc(x.title_th)}</b><span>${esc(x.action_text)}</span>${x.clause?`<small>${esc(x.clause)}</small>`:""}</div>`).join("")}</div></section></div>`;
-  const run=async()=>{const code=normalizeCode($("#whCode").value);if(!code)return;const r=await mslLookupCode(code);if(!r?.found){$("#whResult").innerHTML=`<div class="notice danger"><b>NOT FOUND</b><span>${esc(code)} ไม่มี Mapping ใน Master</span></div>`;return;}$("#whResult").innerHTML=`<div class="detail-grid"><div><span>Material Code</span><b>${esc(r.material_code)}</b></div><div><span>Material Group</span><b>${esc(r.material_group)}</b></div><div><span>Profile Status</span><b>${esc(r.profile_selection_status)}</b></div><div><span>Warehouse Action</span><b>${r.profile_verification_required?"VERIFY PROFILE":"FOLLOW MASTER"}</b></div></div>${r.profile_verification_required?`<div class="notice warning"><b>Multiple Profiles</b><span>ห้ามเลือกเงื่อนไขเอง ให้ตรวจสอบ Profile ก่อนจัดเก็บ</span></div><div class="profile-grid">${allProfilesHtml(r.storage_profiles)}</div>`:profileRows(r.selected_profile)}<div class="notice info"><b>Expired Material</b><span>Warehouse ต้อง Segregate / Identify / HOLD และส่ง Quality/IQC ตรวจตัดสิน ไม่ให้ Warehouse ตัดสิน Pass/Fail เอง</span></div>`;};
-  $("#whCheck").onclick=run;$("#whCode").onkeydown=e=>{if(e.key==="Enter")run();};
+  $("#page").innerHTML=`<div class="page-intro"><div><h2>Warehouse Check</h2><p>ตรวจสอบเงื่อนไขจัดเก็บและอายุวัสดุจากของจริงหน้างาน โดยไม่สร้าง Stock หรือ Receiving ซ้ำกับ WMS</p></div></div><div class="dashboard-columns"><section class="panel"><div class="panel-head"><div><span class="panel-icon">⌕</span><b>Material Storage & Expiry Check</b></div></div><div class="wh-check-grid"><input id="whCode" placeholder="Material Code"><input id="whMfg" type="date" title="MFG Date / Date Code"><button id="whCheck" class="primary">Check</button></div><div id="whResult" class="result-space"><div class="empty-state">กรอก Material Code และ MFG Date เพื่อดู Storage Requirement และสถานะอายุวัสดุ</div></div></section><section class="panel"><div class="panel-head"><div><span class="panel-icon">▤</span><b>Warehouse General Rules</b></div><span class="chip">${fmt((rules||[]).length)} Rules</span></div><div class="rule-list">${(rules||[]).map(x=>`<div><b>${esc(x.title_th)}</b><span>${esc(x.action_text)}</span>${x.clause?`<small>${esc(x.clause)}</small>`:""}</div>`).join("")}</div></section></div>`;
+
+  let lastCheck=null;
+  const run=async()=>{
+    const code=normalizeCode($("#whCode").value),mfg=$("#whMfg").value;
+    if(!code)return;
+    try{
+      const r=await mslLookupCode(code);
+      lastCheck=null;
+      if(!r?.found){$("#whResult").innerHTML=`<div class="notice danger"><b>MATERIAL_CODE_NOT_FOUND</b><span>${esc(code)} ไม่มี Mapping ใน Master — ระบบจะไม่เดา Group</span></div>`;return;}
+      const profile=r.selected_profile;
+      const calc=calcGeneralExpiry(mfg,profile);
+      const profileBlock=r.profile_verification_required
+        ? `<div class="notice warning"><b>PROFILE VERIFICATION REQUIRED</b><span>พบหลาย Storage Profiles — ห้ามเลือกเงื่อนไขเอง และยังไม่อนุญาตให้คำนวณ Expiry</span></div><div class="profile-grid">${allProfilesHtml(r.storage_profiles)}</div>`
+        : profileRows(profile);
+      let expiryBlock='<div class="notice info"><b>Expiry Verification</b><span>กรอก MFG Date / Date Code เพื่อคำนวณวันหมดอายุและเปิดปุ่มแจ้ง DingTalk</span></div>';
+      let notifyBlock='';
+      if(mfg&&!r.profile_verification_required){
+        if(calc?.error){expiryBlock='<div class="notice danger"><b>MFG DATE INVALID</b><span>MFG Date ต้องไม่เป็นวันที่ในอนาคต</span></div>';}
+        else if(calc){
+          const meta=statusMeta(calc.status);
+          expiryBlock=`<div class="expiry-result ${meta.cls}"><b>${meta.label} — ${esc(meta.thai)}</b><span>Expiry ${esc(calc.expiry)} • Remaining ${fmt(calc.remainingDays)} Days • ${calc.remainingPercent}%</span></div>`;
+          notifyBlock=`<div class="ding-alert-box ${meta.cls}"><div><b>แจ้งเตือนหน้างานไปยัง DingTalk</b><span>ใช้เมื่อ Warehouse พบวัสดุใกล้หมดอายุ หมดอายุ หรือมีเหตุให้ต้องการ Quality/IQC ตรวจสอบ</span></div><textarea id="whAlertRemark" rows="3" placeholder="Warehouse Remark / จุดที่พบ / Lot หรือ Location (ถ้ามี)"></textarea><button id="whNotifyDing" class="${calc.status==='EXPIRED'?'danger':'ding-btn'}">${calc.status==='EXPIRED'?'แจ้ง DingTalk & HOLD':'แจ้งเตือน DingTalk'}</button><small id="whNotifyState">จะส่ง Material Code, Group, MFG, Expiry, Remaining Days, Status และ Remark</small></div>`;
+          lastCheck={material_code:r.material_code,material_group:r.material_group,mfg_date:mfg,expiry_date:calc.expiry,remaining_days:calc.remainingDays,remaining_percent:calc.remainingPercent,status:calc.status,profile_no:profile?.profile_no||null,shelf_life:profile?.shelf_life_text||null,storage_temperature:profile?.storage_temperature||null,storage_humidity:profile?.storage_humidity||null,packaging:profile?.packaging||null};
+        }
+      }
+      $("#whResult").innerHTML=`<div class="detail-grid"><div><span>Material Code</span><b>${esc(r.material_code)}</b></div><div><span>Material Group</span><b>${esc(r.material_group)}</b></div><div><span>Profile Status</span><b>${esc(r.profile_selection_status)}</b></div><div><span>Warehouse Action</span><b>${r.profile_verification_required?"VERIFY PROFILE":"FOLLOW MASTER"}</b></div></div>${profileBlock}${expiryBlock}${notifyBlock}<div class="notice info"><b>Expired Material Control</b><span>หาก EXPIRED ให้ Warehouse Segregate / Identify / HOLD และส่ง Quality/IQC ตรวจตัดสิน ไม่ให้ Warehouse ตัดสิน Pass/Fail เอง</span></div>`;
+      const notifyBtn=$("#whNotifyDing");
+      if(notifyBtn&&lastCheck){
+        notifyBtn.onclick=async()=>{
+          const remark=$("#whAlertRemark")?.value.trim()||"";
+          if(!remark)return alert("กรุณาระบุ Warehouse Remark / จุดที่พบก่อนส่ง DingTalk");
+          if(!confirm(`ยืนยันส่งแจ้งเตือน DingTalk สำหรับ ${lastCheck.material_code} (${lastCheck.status}) ?`))return;
+          notifyBtn.disabled=true;notifyBtn.textContent="กำลังส่ง...";
+          const state=$("#whNotifyState");
+          try{
+            const result=await notifyGeneralMaterialDingTalk({...lastCheck,remark,source:"WAREHOUSE_CHECK"});
+            notifyBtn.textContent="ส่ง DingTalk แล้ว ✓";notifyBtn.className="success";
+            if(state)state.textContent=`ส่งสำเร็จ ${new Date(result.sent_at||Date.now()).toLocaleString("th-TH")}`;
+          }catch(e){
+            notifyBtn.disabled=false;notifyBtn.textContent=lastCheck.status==='EXPIRED'?"แจ้ง DingTalk & HOLD":"แจ้งเตือน DingTalk";
+            if(state)state.textContent=`ส่งไม่สำเร็จ: ${e.message}`;
+            alert(`ส่ง DingTalk ไม่สำเร็จ: ${e.message}`);
+          }
+        };
+      }
+    }catch(e){$("#whResult").innerHTML=`<div class="notice danger"><b>CHECK FAILED</b><span>${esc(e.message)}</span></div>`;}
+  };
+  $("#whCheck").onclick=run;$("#whCode").onkeydown=e=>{if(e.key==="Enter")run();};$("#whMfg").onchange=()=>{if($("#whCode").value.trim())run();};
 }
 
 async function masterData(){
