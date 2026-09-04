@@ -116,3 +116,21 @@ Fallback:
 - If `DINGTALK_MATERIAL_WEBHOOK_URL` is not set, the function will use the existing `DINGTALK_WEBHOOK_URL`.
 
 The General Material alert does NOT create stock, receiving, or WMS transactions.
+
+
+## V1.5 - Chemical DingTalk Fix & Diagnostics
+- Removed supplier-specific JD branding from login (now MSL).
+- Chemical expiry alert now uses server-side service role after user JWT verification.
+- Chemical DingTalk request is sent as JSON text-message payload.
+- Added DingTalk response validation (errcode/errmsg).
+- Added a dedicated `ทดสอบ DingTalk` button that tests the webhook without expiry thresholds or duplicate-suppression logic.
+- Recommended env var for existing Chemical flow: `DINGTALK_CHEMICAL_WEBHOOK_URL` (fallback: `DINGTALK_WEBHOOK_URL`).
+- General Material remains on its separate webhook/workflow variable and will be finalized against Workflow 2's actual field schema.
+
+
+## V1.6 — Chemical DingTalk Workflow Fix
+- Restored Chemical DingTalk payload to `text/plain; charset=utf-8` to match the existing DingTalk Workflow webhook contract.
+- `DINGTALK_CHEMICAL_WEBHOOK_URL` is preferred; `DINGTALK_WEBHOOK_URL` remains fallback.
+- Chemical connection test now uses the same Workflow payload contract as production alerts.
+- Receiving now explains when a saved lot did not trigger DingTalk because it was not due or was already sent.
+- General Material Workflow 2 remains separate and is not modified here.

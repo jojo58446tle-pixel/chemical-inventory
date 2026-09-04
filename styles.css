@@ -345,3 +345,30 @@ input:focus,select:focus,textarea:focus{border-color:#8a72ff!important;box-shado
   .quick-actions-grid-3{grid-template-columns:1fr!important}
   .dashboard-overview{padding:22px!important}
 }
+
+
+/* V1.5 DingTalk diagnostics */
+.chemical-alert-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.chemical-alert-actions .small-btn{white-space:nowrap}.login-logo{font-size:16px!important;letter-spacing:.06em!important;font-weight:900!important}
+@media(max-width:620px){.chemical-alert-actions{width:100%}.chemical-alert-actions button{flex:1}}
+
+
+/* ===== Stock UI Fix V1.8 ===== */
+.stock-list{gap:14px!important}
+.stock-item{padding:18px 20px!important;border-radius:24px!important}
+.stock-item-top{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;align-items:start}
+.stock-main{min-width:0}
+.stock-title{display:block;font-size:18px;line-height:1.35;color:#26224a;word-break:break-word}
+.stock-meta{margin-top:6px;font-size:14px;color:#7e7a90!important}
+.stock-qty{align-self:start;justify-self:end;font-size:16px;font-weight:900;color:#1f2140;white-space:nowrap;padding-top:2px}
+.stock-qty span{font-size:14px;color:#1f2140}
+.stock-actions{display:flex;justify-content:flex-start;gap:10px;margin-top:16px}
+.stock-actions .compact-btn{flex:0 0 auto!important;min-width:130px;max-width:160px;padding:10px 18px!important;border-radius:14px!important;font-size:15px;font-weight:800}
+.stock-actions .secondary{background:#fbf9ff!important;border:1px solid #ddd3f0!important;color:#4c447f!important}
+.stock-actions .danger{background:#ef5a73!important;border:1px solid #ef5a73!important;color:#fff!important;box-shadow:none!important}
+.stock-actions .danger:hover{background:#e14c67!important}
+@media(max-width:760px){
+  .stock-item-top{grid-template-columns:1fr!important}
+  .stock-qty{justify-self:start!important}
+  .stock-actions{flex-wrap:wrap}
+  .stock-actions .compact-btn{width:100%;max-width:none}
+}

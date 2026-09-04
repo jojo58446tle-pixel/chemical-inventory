@@ -150,7 +150,7 @@ function login(){
   app.innerHTML=`<main class="login login-split">
     <section class="login-showcase" aria-label="Material Shelf-Life & Storage Control System">
       <div class="login-showcase-inner">
-        <div class="login-logo">JD</div>
+        <div class="login-logo">MSL</div>
         <div class="login-message">
           <div class="login-kicker">MATERIAL QUALITY</div>
           <h1>Material shelf-life,<br>clear control for<br>IQC &amp; warehouse.</h1>
@@ -250,7 +250,7 @@ function mount(){
         <section id="page" class="page"></section>
       </main>
     </div>
-    <footer class="system-footer"><span>Material Shelf-Life &amp; Storage Control System</span><span>Version 1.4 Unified Theme</span></footer>
+    <footer class="system-footer"><span>Material Shelf-Life &amp; Storage Control System</span><span>Version 1.6 Chemical Workflow Fix</span></footer>
   </div>`;
   $("#mobileMenu").onclick=()=>{$(".sidebar").classList.toggle("open");$(".nav-overlay").classList.toggle("show");};
   $(".nav-overlay").onclick=closeMobileNav;
@@ -337,15 +337,56 @@ async function receive(){
     <button id="save" class="primary">บันทึกรับเข้าสารเคมี</button>
   </div>`;
   let mat=null;
-  const lookup=async()=>{const code=$("#code").value.trim();if(!code)return;const {data,error}=await sb.from("materials").select("*").eq("material_code",code).maybeSingle();if(error)throw error;mat=data;if(mat){$("#master").className="card";$("#master").innerHTML="<b>พบ Material Master — แก้ไขข้อมูลได้</b>";$("#materialName").value=mat.material_name||"";$("#shelfLife").value=mat.shelf_life_months?`${mat.shelf_life_months} เดือน`:"";$("#storage").value=mat.storage_condition||"";$("#saveMaster").classList.add("hidden");}else{$("#master").className="card warning";$("#master").innerHTML="Material Code ใหม่ — กรุณากรอกข้อมูลและบันทึก Material Master";$("#materialName").value="";$("#shelfLife").value="";$("#storage").value="";$("#saveMaster").classList.remove("hidden");}calculate();};
+  const lookup=async()=>{const code=$("#code").value.trim();if(!code)return;const {data,error}=await sb.from("materials").select("*").eq("material_code",code).maybeSingle();if(error)throw error;mat=data;if(mat){$("#master").className="card";$("#master").innerHTML="<b>พบ Material Master — แก้ไขข้อมูลได้</b>";$("#materialName").value=mat.material_name||"";$("#shelfLife").value=mat.shelf_life_months?`${mat.shelf_life_months} เดือน`:"";$("#storage").value=mat.storage_condition||"";$("#saveMaster")?.classList.add("hidden");}else{$("#master").className="card warning";$("#master").innerHTML="Material Code ใหม่ — กรุณากรอกข้อมูลและบันทึก Material Master";$("#materialName").value="";$("#shelfLife").value="";$("#storage").value="";$("#saveMaster")?.classList.remove("hidden");}calculate();};
   const masterPayload=()=>({material_code:$("#code").value.trim(),material_name:$("#materialName").value.trim(),shelf_life_months:shelfMonths($("#shelfLife").value),storage_condition:$("#storage").value.trim(),supplier:$("#supplier").value.trim()||null});
-  const saveMaster=async(showMessage=true)=>{const p=masterPayload();if(!p.material_code||!p.material_name||!(p.shelf_life_months>0)||!p.storage_condition)throw new Error("กรอก Material Name, Shelf Life และ Storage Condition ให้ครบ");const {data,error}=await sb.from("materials").upsert(p,{onConflict:"material_code"}).select().single();if(error)throw error;mat=data;$("#saveMaster").classList.add("hidden");$("#master").className="card";$("#master").innerHTML="<b>บันทึก Material Master แล้ว — ยังแก้ไขได้</b>";if(showMessage)alert("บันทึก Material Master แล้ว");return data;};
+  const saveMaster=async(showMessage=true)=>{const p=masterPayload();if(!p.material_code||!p.material_name||!(p.shelf_life_months>0)||!p.storage_condition)throw new Error("กรอก Material Name, Shelf Life และ Storage Condition ให้ครบ");const {data,error}=await sb.from("materials").upsert(p,{onConflict:"material_code"}).select().single();if(error)throw error;mat=data;$("#saveMaster")?.classList.add("hidden");$("#master").className="card";$("#master").innerHTML="<b>บันทึก Material Master แล้ว — ยังแก้ไขได้</b>";if(showMessage)alert("บันทึก Material Master แล้ว");return data;};
   const chosenMfg=()=>{const q=$("#mfgQr").value,l=$("#mfgLabel").value;if(q&&l&&q!==l){const s=$("input[name=mfgSource]:checked")?.value;return s==="QR"?q:s==="LABEL"?l:"";}return l||q;};
   const calculate=()=>{$("#exp").value=addMonths(chosenMfg(),shelfMonths($("#shelfLife").value));};
-  const checkMfg=()=>{const q=$("#mfgQr").value,l=$("#mfgLabel").value,mismatch=q&&l&&q!==l;$("#mfgWarning").classList.toggle("hidden",!mismatch);if(!mismatch)$$('input[name="mfgSource"]').forEach(x=>x.checked=false);calculate();};
+  const checkMfg=()=>{const q=$("#mfgQr").value,l=$("#mfgLabel").value,mismatch=q&&l&&q!==l;$("#mfgWarning")?.classList.toggle("hidden",!mismatch);if(!mismatch)$$('input[name="mfgSource"]').forEach(x=>x.checked=false);calculate();};
   $("#code").onchange=lookup;$("#shelfLife").oninput=calculate;$("#mfgQr").onchange=checkMfg;$("#mfgLabel").onchange=checkMfg;$$('input[name="mfgSource"]').forEach(x=>x.onchange=calculate);$("#saveMaster").onclick=async()=>{try{await saveMaster();}catch(e){alert(e.message);}};
   $("#scan").onclick=()=>scan("reader",async raw=>{const q=parseChemicalQr(raw);if(!q)return alert("อ่าน QR ไม่สำเร็จ: QR ต้องมี Supplier Code, Material Code, Lot และ MFG Date");$("#supplier").value=q.supplier;$("#code").value=q.code;$("#lot").value=q.lot;$("#mfgQr").value=normalizeQrDate(q.mfg);$("#scanResult").textContent=`สแกนสำเร็จ: ${q.supplier} • ${q.code} • ${q.lot} • ${q.mfg}`;await lookup();checkMfg();});
-  $("#save").onclick=async()=>{try{const code=$("#code").value.trim(),supplier=$("#supplier").value.trim(),lot=$("#lot").value.trim(),qty=+$("#qty").value,unit=$("#unit").value.trim(),product=$("#productName").value.trim(),brand=$("#brand").value.trim(),pack=$("#packageSize").value.trim(),rd=$("#rdate").value,q=$("#mfgQr").value,l=$("#mfgLabel").value,mfg=chosenMfg(),ex=$("#exp").value,location=$("#location").value.trim();if(!code||!supplier||!lot||!(qty>0)||!unit||!product||!brand||!pack||!rd||!q||!mfg||!ex||!location)return alert("กรอกข้อมูลให้ครบ (Product Name และ Brand ใส่ NA ได้)");if(q&&l&&q!==l&&!$("input[name=mfgSource]:checked"))return alert("วันที่ผลิตไม่ตรงกัน กรุณาเลือกวันที่ที่จะใช้");await saveMaster(false);const {data:lotId,error}=await sb.rpc("receive_stock_v1",{p_material_id:mat.id,p_supplier_code:supplier,p_lot_no:lot,p_qty:qty,p_unit:unit,p_product_name:product,p_brand:brand,p_package_size:pack,p_received_date:rd,p_mfg_qr_date:q,p_mfg_label_date:l||null,p_mfg_used_date:mfg,p_mfg_source:q&&l&&q!==l?$("input[name=mfgSource]:checked").value:"QR",p_expiry_date:ex,p_location:location});if(error)throw error;let message="บันทึกรับเข้าสารเคมีแล้ว";try{const alertResult=await triggerExpiryAlertNow(lotId);if(alertResult.sent)message=`บันทึกรับเข้าแล้ว และแจ้ง DingTalk ระดับ ${alertResult.level} เดือนแล้ว`;}catch(alertError){console.error("DingTalk alert failed",alertError);message=`บันทึกรับเข้าแล้ว แต่ส่ง DingTalk ไม่สำเร็จ: ${alertError.message}`;}alert(message);render("dashboard");}catch(e){console.error(e);alert(`บันทึกไม่สำเร็จ: ${e.message}`);}};
+  $("#save").onclick=async()=>{
+    const saveBtn=$("#save");
+    if(saveBtn?.disabled)return;
+    if(saveBtn){saveBtn.disabled=true;saveBtn.textContent="กำลังบันทึก...";}
+    let dbSaved=false;
+    let savedLotId=null;
+    try{
+      const code=$("#code")?.value.trim()||"",supplier=$("#supplier")?.value.trim()||"",lot=$("#lot")?.value.trim()||"",qty=+($("#qty")?.value||0),unit=$("#unit")?.value.trim()||"",product=$("#productName")?.value.trim()||"",brand=$("#brand")?.value.trim()||"",pack=$("#packageSize")?.value.trim()||"",rd=$("#rdate")?.value||"",q=$("#mfgQr")?.value||"",l=$("#mfgLabel")?.value||"",mfg=chosenMfg(),ex=$("#exp")?.value||"",location=$("#location")?.value.trim()||"";
+      if(!code||!supplier||!lot||!(qty>0)||!unit||!product||!brand||!pack||!rd||!q||!mfg||!ex||!location){alert("กรอกข้อมูลให้ครบ (Product Name และ Brand ใส่ NA ได้)");return;}
+      const selectedMfg=$("input[name=mfgSource]:checked");
+      if(q&&l&&q!==l&&!selectedMfg){alert("วันที่ผลิตไม่ตรงกัน กรุณาเลือกวันที่ที่จะใช้");return;}
+      await saveMaster(false);
+      if(!mat?.id)throw new Error("ไม่พบ Material Master ID หลังบันทึก");
+      const {data:lotId,error}=await sb.rpc("receive_stock_v1",{p_material_id:mat.id,p_supplier_code:supplier,p_lot_no:lot,p_qty:qty,p_unit:unit,p_product_name:product,p_brand:brand,p_package_size:pack,p_received_date:rd,p_mfg_qr_date:q,p_mfg_label_date:l||null,p_mfg_used_date:mfg,p_mfg_source:q&&l&&q!==l?selectedMfg.value:"QR",p_expiry_date:ex,p_location:location});
+      if(error)throw error;
+      dbSaved=true;
+      savedLotId=lotId;
+    }catch(e){
+      console.error("Chemical receiving DB error",e);
+      alert(`บันทึกไม่สำเร็จ: ${e.message}`);
+      return;
+    }finally{
+      if(!dbSaved&&saveBtn){saveBtn.disabled=false;saveBtn.textContent="บันทึกรับเข้าสารเคมี";}
+    }
+
+    let message="บันทึกรับเข้าสารเคมีแล้ว";
+    try{
+      const alertResult=await triggerExpiryAlertNow(savedLotId);
+      if(alertResult.sent){
+        message=`บันทึกรับเข้าแล้ว และแจ้ง DingTalk ระดับ ${alertResult.level} เดือนแล้ว`;
+      }else{
+        const reasons={NO_ACTIVE_LOTS:"ไม่พบ Active Lot",NO_PENDING_ALERT:"Lot ยังไม่เข้าเงื่อนไข 6/3/2/1 เดือน หรือ Level นี้เคยแจ้งแล้ว"};
+        message=`บันทึกรับเข้าแล้ว แต่ยังไม่ส่ง DingTalk: ${reasons[alertResult.reason]||alertResult.reason||"ไม่เข้าเงื่อนไข"}`;
+      }
+    }catch(alertError){
+      console.error("DingTalk alert failed",alertError);
+      message=`บันทึกรับเข้าแล้ว แต่ส่ง DingTalk ไม่สำเร็จ: ${alertError.message}`;
+    }
+    alert(message);
+    try{await render("dashboard");}
+    catch(uiError){console.error("Post-save UI error",uiError);location.reload();}
+  };
 }
 async function issue(){
   $("#page").innerHTML=`<div class="form"><div class="scanner"><b>สแกนบาร์โค้ด</b><button id="scan" class="secondary">เปิดกล้องสแกน</button><div id="reader"></div></div><label>Material Code<input id="code"></label><div id="fifo" class="card muted">ระบบจะแนะนำ Lot ตาม FIFO</div><label>เลือก Lot<select id="lot"><option value="">—</option></select></label><label>จำนวนเบิก<input id="qty" type="number" min="0.001" step="0.001"></label><label>เหตุผลกรณีเปลี่ยน Lot<input id="note"></label><button id="save" class="success">บันทึกเบิกจ่าย</button></div>`;
@@ -391,7 +432,28 @@ async function issue(){
     }
   };
 }
-async function stock(){const lots=(await getLots()).filter(x=>+x.remaining_qty>0);$("#page").innerHTML=`<label>ค้นหา<input id="search" placeholder="Material / Lot"></label><div class="list" style="margin-top:12px">${lots.length?lots.map(l=>`<div class="item s" data-search="${esc(l.materials.material_code)} ${esc(l.materials.material_name)} ${esc(l.lot_no)}"><div class="row"><b>${esc(l.materials.material_code)} — ${esc(l.materials.material_name)}</b><strong>${fmt(l.remaining_qty)} ${esc(l.unit||l.materials.unit)}</strong></div><div class="muted">Lot ${esc(l.lot_no)} • รับ ${esc(l.received_date)} • Exp ${esc(l.expiry_date)}</div><div class="lot-actions"><button class="secondary edit-lot" data-id="${l.id}">แก้ไข</button><button class="danger cancel-lot" data-id="${l.id}">ลบรายการ</button></div></div>`).join(""):'<div class="card muted">ยังไม่มี Stock</div>'}</div>`;$("#search").oninput=e=>$$(".s").forEach(x=>x.classList.toggle("hidden",!x.dataset.search.toLowerCase().includes(e.target.value.toLowerCase())));$$('.edit-lot').forEach(b=>b.onclick=()=>editStockLot(lots.find(x=>x.id===b.dataset.id)));$$('.cancel-lot').forEach(b=>b.onclick=()=>cancelStockLot(lots.find(x=>x.id===b.dataset.id)));}
+async function stock(){
+  const lots=(await getLots()).filter(x=>+x.remaining_qty>0);
+  $("#page").innerHTML=`<section class="stock-page">
+    <label>ค้นหา<input id="search" placeholder="Material / Lot"></label>
+    <div class="list stock-list" style="margin-top:12px">${lots.length?lots.map(l=>`<article class="item s stock-item" data-search="${esc(l.materials.material_code)} ${esc(l.materials.material_name)} ${esc(l.lot_no)}">
+      <div class="stock-item-top">
+        <div class="stock-main">
+          <b class="stock-title">${esc(l.materials.material_code)} — ${esc(l.materials.material_name)}</b>
+          <div class="muted stock-meta">Lot ${esc(l.lot_no)} • รับ ${esc(l.received_date)} • Exp ${esc(l.expiry_date)}</div>
+        </div>
+        <div class="stock-qty">${fmt(l.remaining_qty)} <span>${esc(l.unit||l.materials.unit)}</span></div>
+      </div>
+      <div class="lot-actions stock-actions">
+        <button class="secondary edit-lot compact-btn" data-id="${l.id}">แก้ไข</button>
+        <button class="danger cancel-lot compact-btn" data-id="${l.id}">ลบรายการ</button>
+      </div>
+    </article>`).join(""):'<div class="card muted">ยังไม่มี Stock</div>'}</div>
+  </section>`;
+  $("#search").oninput=e=>$(".s").forEach(x=>x.classList.toggle("hidden",!x.dataset.search.toLowerCase().includes(e.target.value.toLowerCase())));
+  $('.edit-lot').forEach(b=>b.onclick=()=>editStockLot(lots.find(x=>x.id===b.dataset.id)));
+  $('.cancel-lot').forEach(b=>b.onclick=()=>cancelStockLot(lots.find(x=>x.id===b.dataset.id)));
+}
 
 async function editStockLot(l){
   $("#title").textContent="แก้ไขรายการคงคลัง";
@@ -423,6 +485,13 @@ async function triggerExpiryAlertNow(lotId=null){
   return result;
 }
 
+async function testChemicalDingTalk(){
+  const response=await fetch("/.netlify/functions/test-dingtalk-chemical",{method:"POST",headers:{Authorization:`Bearer ${adminToken}`,"Content-Type":"application/json"},body:JSON.stringify({source:"CHEMICAL_ALERT_PAGE"})});
+  const result=await response.json();
+  if(!response.ok||!result.ok)throw new Error(result.error||"ทดสอบ DingTalk ไม่สำเร็จ");
+  return result;
+}
+
 async function cancelStockLot(l){
   if(!l||!confirm(`ยืนยันลบรายการ ${l.materials?.material_code} • Lot ${l.lot_no} ออกจากคงคลัง?`))return;
   const reason=prompt("ระบุเหตุผลที่ลบรายการ เช่น บันทึกผิด");
@@ -431,8 +500,9 @@ async function cancelStockLot(l){
 }
 async function alerts(){
   const lots=(await getLots()).filter(x=>+x.remaining_qty>0&&daysLeft(x.expiry_date)<=184).sort((a,b)=>a.expiry_date.localeCompare(b.expiry_date));
-  $("#page").innerHTML=`<div class="dashboard-columns"><section class="panel"><div class="panel-head"><div><span class="panel-icon">□</span><b>General Material Expiry Check</b></div><span class="chip">LOOKUP ONLY</span></div><p class="helper">General Material ไม่มี Stock Tracking ในระบบนี้ จึงไม่มี Fake Automatic Alert ต้องตรวจจาก Material Code + MFG Date ณ จุดใช้งาน</p><div class="verify-search"><input id="alertCode" placeholder="Material Code"><input id="alertMfg" type="date"><button id="alertCheck" class="primary">Check</button></div><div id="alertGeneralResult" class="result-space"><div class="empty-state">กรอก Material Code และ MFG Date</div></div></section><section class="panel"><div class="panel-head"><div><span class="panel-icon">⚗</span><b>Chemical Automatic Expiry Alert</b></div><button id="send" class="primary small-btn">ส่ง DingTalk ตอนนี้</button></div><div class="list">${lots.length?lots.slice(0,30).map(lotCard).join(""):'<div class="empty-state">ไม่มีรายการเข้าเงื่อนไข</div>'}</div>${lots.length>30?`<div class="helper">แสดง 30 จาก ${fmt(lots.length)} รายการ</div>`:""}</section></div>`;
-  $("#send").onclick=async()=>{try{const j=await triggerExpiryAlertNow();alert(j.sent?`ส่ง DingTalk แล้ว ${j.count} รายการ`:"ตรวจแล้ว ไม่มีรายการใหม่ที่ต้องแจ้ง");}catch(e){alert(`ส่งไม่สำเร็จ: ${e.message}`);}};
+  $("#page").innerHTML=`<div class="dashboard-columns"><section class="panel"><div class="panel-head"><div><span class="panel-icon">□</span><b>General Material Expiry Check</b></div><span class="chip">LOOKUP ONLY</span></div><p class="helper">General Material ไม่มี Stock Tracking ในระบบนี้ จึงไม่มี Fake Automatic Alert ต้องตรวจจาก Material Code + MFG Date ณ จุดใช้งาน</p><div class="verify-search"><input id="alertCode" placeholder="Material Code"><input id="alertMfg" type="date"><button id="alertCheck" class="primary">Check</button></div><div id="alertGeneralResult" class="result-space"><div class="empty-state">กรอก Material Code และ MFG Date</div></div></section><section class="panel"><div class="panel-head"><div><span class="panel-icon">⚗</span><b>Chemical Automatic Expiry Alert</b></div><div class="chemical-alert-actions"><button id="testChemicalDing" class="secondary small-btn">ทดสอบ DingTalk</button><button id="send" class="primary small-btn">ส่งแจ้งเตือนจริง</button></div></div><div id="chemicalDingStatus" class="notice info"><b>DingTalk Connection</b><span>กด “ทดสอบ DingTalk” เพื่อตรวจ Webhook โดยไม่อิงเงื่อนไขวันหมดอายุ</span></div><div class="list">${lots.length?lots.slice(0,30).map(lotCard).join(""):'<div class="empty-state">ไม่มีรายการเข้าเงื่อนไข</div>'}</div>${lots.length>30?`<div class="helper">แสดง 30 จาก ${fmt(lots.length)} รายการ</div>`:""}</section></div>`;
+  $("#testChemicalDing").onclick=async()=>{const btn=$("#testChemicalDing"),box=$("#chemicalDingStatus");try{btn.disabled=true;btn.textContent="กำลังทดสอบ...";const j=await testChemicalDingTalk();box.className="notice info";box.innerHTML=`<b>DingTalk Test = PASS</b><span>ส่ง Test Message สำเร็จ ${esc(j.sent_at||"")}</span>`;alert("ทดสอบ DingTalk สำเร็จ — กรุณาดูข้อความใน DingTalk");}catch(e){box.className="notice danger";box.innerHTML=`<b>DingTalk Test = FAIL</b><span>${esc(e.message)}</span>`;alert(`ทดสอบไม่สำเร็จ: ${e.message}`);}finally{btn.disabled=false;btn.textContent="ทดสอบ DingTalk";}};
+  $("#send").onclick=async()=>{try{const j=await triggerExpiryAlertNow();if(j.sent){alert(`ส่ง DingTalk แล้ว ${j.count} รายการ`);}else{alert(j.reason==="NO_PENDING_ALERT"?"DingTalk เชื่อมต่อได้ แต่ไม่มีรายการใหม่เข้าเกณฑ์ 6/3/2/1 เดือน หรือรายการนี้เคยแจ้งแล้ว":"ตรวจแล้ว ไม่มีรายการใหม่ที่ต้องแจ้ง");}}catch(e){alert(`ส่งไม่สำเร็จ: ${e.message}`);}};
   $("#alertCheck").onclick=async()=>{const code=normalizeCode($("#alertCode").value),mfg=$("#alertMfg").value;if(!code||!mfg)return;const r=await mslLookupCode(code);if(!r?.found){$("#alertGeneralResult").innerHTML=`<div class="notice danger">MATERIAL_CODE_NOT_FOUND</div>`;return;}if(r.profile_verification_required){$("#alertGeneralResult").innerHTML=`<div class="notice warning"><b>PROFILE VERIFICATION REQUIRED</b><span>ไม่สามารถคำนวณ Expiry ก่อนยืนยัน Profile</span></div>`;return;}const c=calcGeneralExpiry(mfg,r.selected_profile);if(!c||c.error){$("#alertGeneralResult").innerHTML='<div class="notice danger">ไม่สามารถคำนวณ Expiry ได้</div>';return;}const m=statusMeta(c.status);$("#alertGeneralResult").innerHTML=`<div class="expiry-result ${m.cls}"><b>${m.label}</b><span>Expiry ${esc(c.expiry)} • Remaining ${fmt(c.remainingDays)} Days • ${c.remainingPercent}%</span><small>${esc(m.thai)}</small></div>`;};
 }
 async function history(){const {data,error}=await sb.from("stock_movements").select("*,materials(*),chemical_lots(*)").order("created_at",{ascending:false}).limit(500);if(error)throw error;$("#page").innerHTML=`<div class="list">${(data||[]).map(m=>`<div class="item"><div class="row"><b>${m.movement_type==="IN"?"รับเข้า":"เบิกจ่าย"} ${esc(m.materials?.material_code)}</b><span>${new Date(m.created_at).toLocaleString("th-TH")}</span></div><div>Lot ${esc(m.chemical_lots?.lot_no)} • ${fmt(m.qty)} ${esc(m.materials?.unit)}</div><div class="muted">${esc(m.note||"")}</div></div>`).join("")||'<div class="card muted">ยังไม่มีประวัติ</div>'}</div>`;}
