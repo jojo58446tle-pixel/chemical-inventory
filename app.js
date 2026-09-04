@@ -219,8 +219,6 @@ function mount(){
         </div>
         <nav class="side-nav primary-nav" aria-label="Main navigation">
           <button data-page="dashboard">${navIcon("dashboard")}<span>Dashboard</span></button>
-          <button data-page="lookup">${navIcon("lookup")}<span>Search / Lookup</span></button>
-          <button data-page="warehouse">${navIcon("warehouse")}<span>Warehouse Check</span></button>
         </nav>
 
         <details class="nav-group" id="operationNav">
@@ -241,15 +239,6 @@ function mount(){
           </nav>
         </details>
 
-        <details class="nav-group" id="systemNav">
-          <summary><span class="nav-group-icon">☷</span><span>Reports &amp; System</span><i>⌄</i></summary>
-          <nav class="side-nav nested-nav">
-            <button data-page="report">${navIcon("report")}<span>Reports</span></button>
-            <button data-page="master">${navIcon("master")}<span>Master Data</span></button>
-            <button data-page="settings">${navIcon("settings")}<span>Settings</span></button>
-          </nav>
-        </details>
-
         <div class="master-reference"><b>Master Data</b><span>Read-only access</span></div>
       </aside>
       <div class="nav-overlay"></div>
@@ -261,7 +250,7 @@ function mount(){
         <section id="page" class="page"></section>
       </main>
     </div>
-    <footer class="system-footer"><span>Material Shelf-Life &amp; Storage Control System</span><span>Version 1.3 Theme Refined</span></footer>
+    <footer class="system-footer"><span>Material Shelf-Life &amp; Storage Control System</span><span>Version 1.4 Unified Theme</span></footer>
   </div>`;
   $("#mobileMenu").onclick=()=>{$(".sidebar").classList.toggle("open");$(".nav-overlay").classList.toggle("show");};
   $(".nav-overlay").onclick=closeMobileNav;
@@ -277,7 +266,7 @@ async function render(name){
   $("#pageSubtitle").textContent=name==="dashboard"?"ระบบควบคุมอายุการเก็บรักษาและการจัดเก็บวัสดุ":"";
   $$(".side-nav button").forEach(b=>b.classList.toggle("active",b.dataset.page===name));
   if(["receive","issue","stock","history"].includes(name))$("#chemicalNav").open=true;
-  if(["report","master","settings"].includes(name))$("#systemNav").open=true;
+  const systemNav=$("#systemNav"); if(systemNav && ["report","master","settings"].includes(name))systemNav.open=true;
   $("#page").innerHTML='<div class="loading"><span class="spinner"></span>กำลังโหลด...</div>';
   try{await ({dashboard,lookup,incoming,warehouse,alerts,report,master:masterData,settings,receive,issue,stock,history,more}[name]||dashboard)();}
   catch(e){console.error(e);$("#page").innerHTML=`<div class="panel error-panel"><b>ไม่สามารถโหลดข้อมูลได้</b><div>${esc(e.message)}</div></div>`;}
