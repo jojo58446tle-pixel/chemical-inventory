@@ -150,10 +150,10 @@ function login(){
   app.innerHTML=`<main class="login login-split">
     <section class="login-showcase" aria-label="Material Shelf-Life & Storage Control System">
       <div class="login-showcase-inner">
-        <div class="login-logo">MSL</div>
+        <div class="login-logo">JD</div>
         <div class="login-message">
-          <div class="login-kicker">MATERIAL CONTROL</div>
-          <h1>Material Shelf-Life<br>&amp; Storage Control<br>System.</h1>
+          <div class="login-kicker">MATERIAL QUALITY</div>
+          <h1>Material shelf-life,<br>clear control for<br>IQC &amp; warehouse.</h1>
           <p>ระบบควบคุมอายุการเก็บรักษาและการจัดเก็บวัสดุ</p>
         </div>
         <div class="login-steps" aria-label="System process">
@@ -163,8 +163,8 @@ function login(){
     </section>
     <section class="login-access">
       <div class="login-access-card">
-        <div class="login-access-kicker">SECURE ACCESS</div>
-        <h2>Sign in to system</h2>
+        <div class="login-access-kicker">ADMIN ACCESS</div>
+        <h2>Sign in to update</h2>
         <p class="login-access-copy">เข้าสู่ระบบเพื่อใช้งาน Material Shelf-Life &amp; Storage Control System</p>
         <form id="login" class="login-form">
           <label>Username
@@ -176,7 +176,7 @@ function login(){
               <button id="togglePassword" type="button" class="password-toggle" aria-label="แสดงรหัสผ่าน">Show</button>
             </div>
           </label>
-          <button id="loginSubmit" class="login-submit" type="submit">Continue to System <span>→</span></button>
+          <button id="loginSubmit" class="login-submit" type="submit">Continue to Portal <span>→</span></button>
           <div id="err" class="login-error" role="alert"></div>
         </form>
         <div class="login-status"><span class="status-light"></span>Production mode · Secure server-side authentication</div>
@@ -198,7 +198,7 @@ function login(){
       const result=await response.json();if(!response.ok||!result.ok)throw new Error(result.error||"Login failed");
       adminToken=result.access_token;sessionStorage.setItem(TOKEN_KEY,adminToken);sb=createDatabaseClient(adminToken);mount();
     }catch(error){console.error(error);err.textContent="ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง";}
-    finally{button.disabled=false;button.innerHTML='Continue to System <span>→</span>';}
+    finally{button.disabled=false;button.innerHTML='Continue to Portal <span>→</span>';}
   };
 }
 function mount(){
@@ -209,7 +209,6 @@ function mount(){
       <div class="header-mark">M</div>
       <div class="header-title"><b>Material Shelf-Life &amp; Storage Control System</b><span>ระบบควบคุมอายุการเก็บรักษาและการจัดเก็บวัสดุ</span></div>
       <div class="header-ref">TH-MM-R-007-2025</div>
-      <button class="header-icon" data-page="alerts" title="Expiry Alert">♢</button>
       <button class="profile-button" data-page="settings" title="Settings">A</button>
     </header>
     <div class="system-body">
@@ -221,10 +220,16 @@ function mount(){
         <nav class="side-nav primary-nav" aria-label="Main navigation">
           <button data-page="dashboard">${navIcon("dashboard")}<span>Dashboard</span></button>
           <button data-page="lookup">${navIcon("lookup")}<span>Search / Lookup</span></button>
-          <button data-page="incoming">${navIcon("incoming")}<span>Incoming Check</span></button>
           <button data-page="warehouse">${navIcon("warehouse")}<span>Warehouse Check</span></button>
-          <button data-page="alerts">${navIcon("alerts")}<span>Expiry Alert</span></button>
         </nav>
+
+        <details class="nav-group" id="operationNav">
+          <summary><span class="nav-group-icon">▣</span><span>More Tools</span><i>⌄</i></summary>
+          <nav class="side-nav nested-nav">
+            <button data-page="incoming">${navIcon("incoming")}<span>Incoming Check</span></button>
+            <button data-page="alerts">${navIcon("alerts")}<span>Expiry Alert</span></button>
+          </nav>
+        </details>
 
         <details class="nav-group" id="chemicalNav">
           <summary><span class="nav-group-icon">⚗</span><span>Chemical Inventory</span><i>⌄</i></summary>
@@ -245,7 +250,7 @@ function mount(){
           </nav>
         </details>
 
-        <div class="master-reference"><b>Master Data</b><span>Read-only for normal users</span></div>
+        <div class="master-reference"><b>Master Data</b><span>Read-only access</span></div>
       </aside>
       <div class="nav-overlay"></div>
       <main class="content-shell">
@@ -256,7 +261,7 @@ function mount(){
         <section id="page" class="page"></section>
       </main>
     </div>
-    <footer class="system-footer"><span>Material Shelf-Life &amp; Storage Control System</span><span>Version 1.1 UI Refined</span></footer>
+    <footer class="system-footer"><span>Material Shelf-Life &amp; Storage Control System</span><span>Version 1.3 Theme Refined</span></footer>
   </div>`;
   $("#mobileMenu").onclick=()=>{$(".sidebar").classList.toggle("open");$(".nav-overlay").classList.toggle("show");};
   $(".nav-overlay").onclick=closeMobileNav;
@@ -266,6 +271,8 @@ function mount(){
 async function render(name){
   const titles={dashboard:"Material Shelf-Life & Storage Control System",lookup:"Search / Lookup",incoming:"Incoming Check",warehouse:"Warehouse Check",alerts:"Expiry Alert",report:"Reports",master:"Master Data",settings:"Settings",receive:"Chemical Receiving",issue:"Chemical Issue",stock:"Chemical Stock",history:"Chemical Movement History",more:"Chemical Tools"};
   const section=["receive","issue","stock","history","more"].includes(name)?"CHEMICAL INVENTORY":"MATERIAL CONTROL";
+  const heading=$(".page-heading");
+  if(heading)heading.classList.toggle("dashboard-heading-hidden",name==="dashboard");
   $("#title").textContent=titles[name]||name;$("#sectionLabel").textContent=section;
   $("#pageSubtitle").textContent=name==="dashboard"?"ระบบควบคุมอายุการเก็บรักษาและการจัดเก็บวัสดุ":"";
   $$(".side-nav button").forEach(b=>b.classList.toggle("active",b.dataset.page===name));
@@ -294,7 +301,7 @@ async function dashboard(){
 
     <div class="dashboard-main-grid">
       <section class="panel quick-lookup-panel">
-        <div class="panel-head"><div><span class="panel-icon">⌕</span><b>Quick Material Lookup</b></div><span class="chip">GENERAL MATERIAL</span></div>
+        <div class="panel-head"><div><span class="panel-icon">⌕</span><b>Quick Material Lookup</b></div></div>
         <div class="search-inline"><input id="dashCode" placeholder="กรอก Material Code เช่น SD000197" autocomplete="off"><button id="dashSearch" class="primary">Search</button></div>
         <p class="helper">ระบบจะแสดง Material Group, Shelf Life, Temperature, Humidity, Packaging และ Remark จาก Master</p>
       </section>
@@ -311,11 +318,10 @@ async function dashboard(){
 
     <section class="quick-actions-panel">
       <div class="quick-actions-title"><b>Quick Actions</b><span>เข้าถึงงานหลักได้เร็วขึ้น</span></div>
-      <div class="quick-actions-grid">
+      <div class="quick-actions-grid quick-actions-grid-3">
         <button data-go="lookup"><span>⌕</span><b>Search</b><small>ค้นหาข้อมูลวัสดุ</small></button>
         <button data-go="incoming"><span>▣</span><b>Incoming Check</b><small>ตรวจสอบก่อนรับเข้า</small></button>
         <button data-go="warehouse"><span>▤</span><b>Warehouse Check</b><small>ตรวจเงื่อนไขจัดเก็บ</small></button>
-        <button data-go="alerts"><span>♢</span><b>Expiry Alert</b><small>ติดตามสถานะหมดอายุ</small></button>
       </div>
     </section>`;
   bindGo();
