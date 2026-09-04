@@ -10,11 +10,14 @@ exports.handler = async (event) => {
 
     const body = JSON.parse(event.body || "{}");
     const mode = String(body.mode || "workflow_text").toLowerCase();
-    const webhook=process.env.DINGTALK_CHEMICAL_WEBHOOK_URL||process.env.DINGTALK_WEBHOOK_URL;
-    if(!webhook)throw new Error("ยังไม่ได้ตั้งค่า DINGTALK_CHEMICAL_WEBHOOK_URL หรือ DINGTALK_WEBHOOK_URL");
+    // Chemical workflow source of truth: use the original webhook variable only.
+    const webhook=process.env.DINGTALK_WEBHOOK_URL;
+    if(!webhook)throw new Error("ยังไม่ได้ตั้งค่า DINGTALK_WEBHOOK_URL");
 
     const now=new Intl.DateTimeFormat("th-TH",{timeZone:"Asia/Bangkok",dateStyle:"medium",timeStyle:"medium"}).format(new Date());
     const content=[
+      // Required by DingTalk Workflow1 keyword filter.
+      "แจ้งเตือนสารเคมี",
       "Chemical DingTalk Connection Test",
       "Material Shelf-Life & Storage Control System",
       `Time: ${now}`,
