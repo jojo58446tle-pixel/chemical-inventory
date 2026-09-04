@@ -16,9 +16,9 @@ exports.handler = async (event) => {
     const body = JSON.parse(event.body || "{}");
     const supabaseUrl = process.env.SUPABASE_URL || "https://eknwvgjftjimurlynfmv.supabase.co";
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    const webhook = process.env.DINGTALK_CHEMICAL_WEBHOOK_URL || process.env.DINGTALK_WEBHOOK_URL;
+    const webhook = process.env.DINGTALK_WEBHOOK_URL;
     if (!serviceRoleKey) throw new Error("Netlify ยังไม่ได้ตั้งค่า SUPABASE_SERVICE_ROLE_KEY");
-    if (!webhook) throw new Error("Netlify ยังไม่ได้ตั้งค่า DINGTALK_CHEMICAL_WEBHOOK_URL หรือ DINGTALK_WEBHOOK_URL");
+    if (!webhook) throw new Error("Netlify ยังไม่ได้ตั้งค่า DINGTALK_WEBHOOK_URL");
 
     const supabase = createClient(supabaseUrl, serviceRoleKey, { auth:{ persistSession:false, autoRefreshToken:false } });
 
@@ -111,7 +111,7 @@ function validateDingTalkResponse_(text) {
   }
 }
 function buildMessage_(months, lots) {
-  const lines = [`⚠️ Chemical Expiry Alert — ${months} Month Level`];
+  const lines = [`⚠️ แจ้งเตือนสารเคมีใกล้หมดอายุ ${months} เดือน`];
   lots.forEach((lot, index) => {
     if (lots.length > 1) lines.push("", `รายการที่ ${index + 1}`);
     lines.push(`Material Code: ${value_(lot.materials?.material_code)}`);

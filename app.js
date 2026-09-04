@@ -450,9 +450,9 @@ async function stock(){
       </div>
     </article>`).join(""):'<div class="card muted">ยังไม่มี Stock</div>'}</div>
   </section>`;
-  $("#search").oninput=e=>$(".s").forEach(x=>x.classList.toggle("hidden",!x.dataset.search.toLowerCase().includes(e.target.value.toLowerCase())));
-  $('.edit-lot').forEach(b=>b.onclick=()=>editStockLot(lots.find(x=>x.id===b.dataset.id)));
-  $('.cancel-lot').forEach(b=>b.onclick=()=>cancelStockLot(lots.find(x=>x.id===b.dataset.id)));
+  $("#search").oninput=e=>$$(".s").forEach(x=>x.classList.toggle("hidden",!x.dataset.search.toLowerCase().includes(e.target.value.toLowerCase())));
+  $$('.edit-lot').forEach(b=>b.onclick=()=>editStockLot(lots.find(x=>x.id===b.dataset.id)));
+  $$('.cancel-lot').forEach(b=>b.onclick=()=>cancelStockLot(lots.find(x=>x.id===b.dataset.id)));
 }
 
 async function editStockLot(l){

@@ -1,41 +1,23 @@
--- Chemical Inventory: Receiving Chemical V1
--- Run this file once in Supabase SQL Editor before deploying the new frontend.
+-- Chemical Active Lot Hotfix
+-- Fixes the case where a previously cancelled Material+Lot is received again:
+-- receive_stock_v1 used ON CONFLICT but did not restore is_active=true.
+-- Result was: Receiving succeeded, but Stock and DingTalk could not find the Active Lot.
 
-alter table public.materials
-  add column if not exists shelf_life_months integer,
-  add column if not exists storage_condition text;
+begin;
 
-alter table public.materials alter column unit drop not null;
+-- 1) Repair only inconsistent rows created by the bug.
+-- A correctly cancelled lot has remaining_qty = 0, so an inactive lot with positive stock
+-- is inconsistent and should be restored as active.
+update public.chemical_lots
+set
+  is_active = true,
+  cancelled_at = null,
+  cancelled_reason = null
+where is_active = false
+  and remaining_qty > 0;
 
-alter table public.chemical_lots
-  add column if not exists supplier_code text,
-  add column if not exists product_name text,
-  add column if not exists brand text,
-  add column if not exists unit text,
-  add column if not exists package_size text,
-  add column if not exists mfg_qr_date date,
-  add column if not exists mfg_label_date date,
-  add column if not exists mfg_used_date date,
-  add column if not exists mfg_source text,
-  add column if not exists storage_location text;
-
-create table if not exists public.mfg_date_mismatch_logs (
-  id uuid primary key default gen_random_uuid(),
-  material_id uuid not null references public.materials(id),
-  lot_id uuid not null references public.chemical_lots(id),
-  qr_mfg_date date not null,
-  label_mfg_date date not null,
-  selected_mfg_date date not null,
-  selected_source text not null check (selected_source in ('QR','LABEL')),
-  created_by uuid references auth.users(id),
-  created_at timestamptz not null default now()
-);
-
-alter table public.mfg_date_mismatch_logs enable row level security;
-drop policy if exists "authenticated mismatch logs" on public.mfg_date_mismatch_logs;
-create policy "authenticated mismatch logs" on public.mfg_date_mismatch_logs
-  for all to authenticated using (true) with check (true);
-
+-- 2) Replace receive_stock_v1 so re-receiving a previously cancelled Material+Lot
+-- safely reactivates that lot.
 create or replace function public.receive_stock_v1(
   p_material_id uuid,
   p_supplier_code text,
@@ -120,3 +102,10 @@ end $$;
 grant execute on function public.receive_stock_v1(
   uuid,text,text,numeric,text,text,text,text,date,date,date,date,text,date,text
 ) to authenticated;
+
+commit;
+
+-- Verification: this should return zero inconsistent rows.
+select id, lot_no, remaining_qty, is_active
+from public.chemical_lots
+where is_active = false and remaining_qty > 0;

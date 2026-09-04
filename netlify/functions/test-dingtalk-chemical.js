@@ -8,30 +8,20 @@ exports.handler = async (event) => {
     try{jwt.verify(token,process.env.SUPABASE_JWT_SECRET,{algorithms:["HS256"]});}
     catch(_e){return reply(401,{ok:false,error:"Unauthorized"});}
 
-    const body = JSON.parse(event.body || "{}");
-    const mode = String(body.mode || "workflow_text").toLowerCase();
-    // Chemical workflow source of truth: use the original webhook variable only.
+    JSON.parse(event.body || "{}");
     const webhook=process.env.DINGTALK_WEBHOOK_URL;
     if(!webhook)throw new Error("ยังไม่ได้ตั้งค่า DINGTALK_WEBHOOK_URL");
 
     const now=new Intl.DateTimeFormat("th-TH",{timeZone:"Asia/Bangkok",dateStyle:"medium",timeStyle:"medium"}).format(new Date());
     const content=[
-      // Required by DingTalk Workflow1 keyword filter.
       "แจ้งเตือนสารเคมี",
       "Chemical DingTalk Connection Test",
       "Material Shelf-Life & Storage Control System",
-      `Time: ${now}`,
-      `Mode: ${mode}`
+      `Time: ${now}`
     ].join("\n");
 
-    let headers, requestBody;
-    if(mode === "robot_json"){
-      headers={"Content-Type":"application/json"};
-      requestBody=JSON.stringify({msgtype:"text",text:{content}});
-    } else {
-      headers={"Content-Type":"text/plain; charset=utf-8"};
-      requestBody=content;
-    }
+    const headers={"Content-Type":"text/plain; charset=utf-8"};
+    const requestBody=content;
 
     const r=await fetch(webhook,{method:"POST",headers,body:requestBody});
     const text=await r.text();
@@ -47,10 +37,9 @@ exports.handler = async (event) => {
       ok:true,
       accepted:true,
       sent_at:new Date().toISOString(),
-      mode,
       http_status:r.status,
       response:text.slice(0,600),
-      robot_ack:!!(parsed && Number(parsed.errcode)===0)
+      workflow_text:true
     });
   } catch(e){
     console.error("Chemical DingTalk test error:",e);

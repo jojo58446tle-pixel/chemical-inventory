@@ -124,13 +124,18 @@ The General Material alert does NOT create stock, receiving, or WMS transactions
 - Chemical DingTalk request is sent as JSON text-message payload.
 - Added DingTalk response validation (errcode/errmsg).
 - Added a dedicated `ทดสอบ DingTalk` button that tests the webhook without expiry thresholds or duplicate-suppression logic.
-- Recommended env var for existing Chemical flow: `DINGTALK_CHEMICAL_WEBHOOK_URL` (fallback: `DINGTALK_WEBHOOK_URL`).
+- Recommended env var for existing Chemical flow: `DINGTALK_WEBHOOK_URL`.
 - General Material remains on its separate webhook/workflow variable and will be finalized against Workflow 2's actual field schema.
 
 
 ## V1.6 — Chemical DingTalk Workflow Fix
 - Restored Chemical DingTalk payload to `text/plain; charset=utf-8` to match the existing DingTalk Workflow webhook contract.
-- `DINGTALK_CHEMICAL_WEBHOOK_URL` is preferred; `DINGTALK_WEBHOOK_URL` remains fallback.
+- Chemical alert uses only `DINGTALK_WEBHOOK_URL`, matching the original working workflow.
 - Chemical connection test now uses the same Workflow payload contract as production alerts.
 - Receiving now explains when a saved lot did not trigger DingTalk because it was not due or was already sent.
 - General Material Workflow 2 remains separate and is not modified here.
+
+## V2.3 hotfix
+- Fix Stock page selector bug (`$` -> `$$` for list actions/search).
+- Fix re-receiving a previously cancelled Material+Lot so `is_active` is restored.
+- Includes `supabase/CHEMICAL_ACTIVE_LOT_HOTFIX.sql` to repair current inconsistent inactive rows with positive stock.
