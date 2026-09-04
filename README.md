@@ -1,58 +1,96 @@
-# Chemical Inventory — Final No-Email Login
+# Material Shelf-Life & Storage Control System — Production V1
 
-ระบบ Login:
-- Username + Password
-- ไม่มีอีเมล
-- รหัสผ่านไม่อยู่ในหน้าเว็บหรือ GitHub
-- รหัสอยู่ใน Netlify Environment Variables
-- Session มีอายุ 8 ชั่วโมง
+ระบบนี้พัฒนาต่อจาก Chemical Inventory เดิม โดยใช้ Supabase Project เดิมและแยก General Material ด้วยตาราง `msl_*`
 
-## 1) อัปโหลดไฟล์ทั้งหมดทับ Repository เดิม
+## Production behavior
 
-ใช้ Repository `chemical-inventory` เดิม เพื่อให้ลิงก์ Netlify เดิมไม่เปลี่ยน
+### Chemical Material — เดิมยังทำงานต่อ
+- Login เดิม (Netlify Function + custom authenticated JWT)
+- Receiving
+- Lot Tracking
+- Stock / Issue
+- MFG mismatch log
+- Expiry calculation
+- Expiry alert
+- DingTalk alert
+- Excel export
 
-## 2) ตั้ง Netlify Environment Variables
+### General Material — Lookup / Verification only
+- Material Code → Material Group
+- Material Group → Shelf Life / Temperature / RH / Packaging / Remark
+- Manufacturing Date → Expiry / Remaining Days / Remaining % / Status
+- Warehouse guidance
+- Missing Mapping = `MATERIAL_CODE_NOT_FOUND`
+- Multiple Storage Profiles = `PROFILE_VERIFICATION_REQUIRED`
+- ไม่สร้าง Stock / Receiving transaction ซ้ำกับ WMS
 
-ไปที่ Site configuration → Environment variables แล้วเพิ่ม:
+## Database
 
-- `ADMIN_USERNAME` = `admin`
-- `ADMIN_PASSWORD` = รหัสที่คุณต้องการ
-- `SUPABASE_JWT_SECRET` = JWT Secret จาก Supabase Project Settings
-- `SUPABASE_URL` = API URL
-- `SUPABASE_SERVICE_ROLE_KEY` = Service role key
-- `DINGTALK_WEBHOOK_URL` = DingTalk Webhook (ใส่ภายหลังได้)
+Production tables added in the same Supabase Project:
+- `msl_master_versions`
+- `msl_material_groups`
+- `msl_material_codes`
+- `msl_storage_profiles`
+- `msl_material_profile_scope`
+- `msl_warehouse_rules`
+- `msl_data_issues`
+- `msl_master_import_audit`
 
-รหัสผ่านมีเฉพาะ `ADMIN_PASSWORD` ใน Netlify
+The existing Chemical tables are not replaced.
 
-## 3) config.js
+Current validated seed baseline:
+- Material Groups: 439
+- Material Codes: 313
+- Storage Profiles: 452
+- Warehouse Rules: 6
+- Open Data Issues: 8
 
-ใส่:
-- `SUPABASE_URL`
-- `SUPABASE_PUBLISHABLE_KEY`
+Validated behavior:
+- `SD000197` → `S003D0` → SINGLE_PROFILE
+- `FC057407` → `F004BC` → PROFILE_VERIFICATION_REQUIRED (2 profiles)
+- `FE000312` → MATERIAL_CODE_NOT_FOUND
 
-Publishable key เป็น Public key สำหรับหน้าเว็บ ห้ามใส่ Service role key ในไฟล์นี้
+### SQL files
+- `supabase/MSL_DATABASE_FINAL_V2.sql` — full General Material DB rebuild/bootstrap (base + multi-profile guard)
+- `supabase/msl-profile-selection-control.sql` — profile-selection patch only
 
-## 4) รัน SQL หนึ่งครั้ง
+If the production database has already been migrated and validated, **do not rerun the full SQL just for deployment**.
 
-เปิด `supabase/login-no-email-migration.sql`
-คัดลอกทั้งหมดไปวางใน Supabase SQL Editor แล้วกด Run
+## Deploy to the existing Netlify site
 
-จากนั้นเปิด `supabase/receiving-v1-migration.sql`
-คัดลอกทั้งหมดไปวางใน Supabase SQL Editor แล้วกด Run เพื่อเพิ่ม Receiving Chemical V1
+1. Replace the source in the existing `chemical-inventory` repository/site with this package.
+2. Keep the existing `config.js` Supabase URL and publishable key for the same Chemical Supabase Project.
+3. Keep these Netlify Environment Variables:
+   - `ADMIN_USERNAME`
+   - `ADMIN_PASSWORD`
+   - `SUPABASE_JWT_SECRET`
+   - `SUPABASE_URL`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+   - `DINGTALK_WEBHOOK_URL`
+4. Deploy using the existing Netlify site so the current URL and Chemical data remain unchanged.
 
-## 5) Deploy ใหม่
+## Security
 
-เมื่อ Commit ไฟล์ขึ้น GitHub Netlify จะ Deploy อัตโนมัติ
+- Browser uses only Supabase publishable key.
+- Service role key stays in Netlify Environment Variables only.
+- General Material tables use RLS.
+- Normal authenticated users have read-only access to `msl_*` master tables.
+- `msl_lookup_material_code()` and `msl_lookup_material_group()` require authenticated role.
+- Material profile mapping is not written by normal frontend users.
 
-Login:
-- Username: `Puk` (หรือตามค่า `ADMIN_USERNAME` ใน Netlify)
-- Password: ค่าที่ตั้งใน `ADMIN_PASSWORD`
+## UI pages
 
-## Receiving Chemical V1
+- Dashboard
+- Search / Lookup
+- Incoming Check
+- Warehouse Check
+- Expiry Alert
+- Reports
+- Master Data
+- Settings
+- Chemical Receiving
+- Chemical Issue
+- Chemical Stock
+- Chemical Movement History
 
-- QR แยก 4 ส่วน: Supplier Code, Material Code, Lot, MFG Date
-- Unit ให้ผู้ใช้กรอกเอง
-- Material Code เดิมดึง Material Name, Shelf Life, Storage Condition และแก้ไขได้
-- Material Code ใหม่บันทึก Material Master ได้โดยไม่ใช้ BOM
-- Expiry Date คำนวณจาก MFG Date + Shelf Life
-- ถ้าวันที่ผลิตจาก QR และฉลากสินค้าไม่ตรงกัน ต้องเลือกวันที่ที่จะใช้และระบบบันทึก Log
+Version: **1.0.0**

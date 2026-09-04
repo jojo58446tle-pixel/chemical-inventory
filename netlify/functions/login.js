@@ -18,6 +18,7 @@ exports.handler = async (event) => {
 
     const usernameOK =
       typeof username === "string" &&
+      username.length === expectedUsername.length &&
       crypto.timingSafeEqual(
         Buffer.from(username),
         Buffer.from(expectedUsername)
