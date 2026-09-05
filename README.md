@@ -139,3 +139,13 @@ The General Material alert does NOT create stock, receiving, or WMS transactions
 - Fix Stock page selector bug (`$` -> `$$` for list actions/search).
 - Fix re-receiving a previously cancelled Material+Lot so `is_active` is restored.
 - Includes `supabase/CHEMICAL_ACTIVE_LOT_HOTFIX.sql` to repair current inconsistent inactive rows with positive stock.
+
+## V2.4 General Material Expiry Check
+- Chemical flow preserved from V2.3.
+- General Material remains LOOKUP ONLY; no stock/receiving transaction is created.
+- General expiry status corrected: EXPIRED only after expiry date; <10% remaining is NEAR_EXPIRY.
+- General DingTalk alert is manual and only available for EXPIRING_SOON / NEAR_EXPIRY / EXPIRED.
+- Separate Workflow 2 webhook only: DINGTALK_MATERIAL_WEBHOOK_URL.
+- Workflow 2 format: text/plain; keyword: แจ้งเตือนวัสดุทั่วไป.
+- Added Workflow 2 test button on Expiry Alert page.
+- Multiple Storage Profiles remain blocked pending explicit profile verification; system does not guess.
