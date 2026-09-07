@@ -109,6 +109,9 @@ Version: **1.0.0**
 - Mapped Groups is calculated from distinct active group codes referenced by those mappings, not from the broader Shelf-Life & Storage Master.
 - Data Attention remains available to Master Data/report logic and is removed only from the main Dashboard.
 
+## V2.6.1 — Netlify Function Dependency Fix
+- Added the top-level `@netlify/blobs` dependency required by `netlify/functions/material-master.js` so Netlify esbuild can bundle the function.
+
 
 ## UI Refinement V1.1
 - Split-screen production login based on supplied reference style.
