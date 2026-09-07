@@ -95,6 +95,14 @@ If the production database has already been migrated and validated, **do not rer
 
 Version: **1.0.0**
 
+## V2.5 — Dashboard Auto Load & IQC 50% Shelf-Life Rule
+- Dashboard now waits for the authenticated database client before its first query.
+- Initial dashboard loading automatically retries temporary connection/server failures with bounded deterministic backoff.
+- Authentication/configuration failures are not masked by retries.
+- General Material Incoming Check now includes an Inspection Date and evaluates the IQC minimum remaining shelf-life requirement (≥ 50%).
+- IQC outcomes: ACCEPTABLE / PASS, BELOW 50% REQUIREMENT / FAIL-REVIEW, and EXPIRED — DO NOT USE / FAIL.
+- Existing Material Master, Storage Requirement, Chemical Inventory, and database schema are unchanged.
+
 
 ## UI Refinement V1.1
 - Split-screen production login based on supplied reference style.

@@ -5,10 +5,13 @@ const app = document.querySelector("#app");
 const TOKEN_KEY = "chemical_admin_token";
 let adminToken = sessionStorage.getItem(TOKEN_KEY) || "";
 let sb = null;
+let databaseReady = false;
+const DASHBOARD_RETRY_DELAYS_MS = [0, 400, 1200];
 const $=(s,e=document)=>e.querySelector(s), $$=(s,e=document)=>[...e.querySelectorAll(s)];
 const esc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
 const fmt=n=>Number(n||0).toLocaleString("th-TH",{maximumFractionDigits:3});
 const today=()=>new Date().toISOString().slice(0,10);
+const localToday=()=>{const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,10);};
 const daysLeft=d=>Math.ceil((new Date(d+"T23:59:59")-new Date())/86400000);
 const addMonths=(dateText,months)=>{if(!dateText||!(months>=0))return"";const d=new Date(`${dateText}T12:00:00`),day=d.getDate();d.setDate(1);d.setMonth(d.getMonth()+Number(months));const last=new Date(d.getFullYear(),d.getMonth()+1,0).getDate();d.setDate(Math.min(day,last));return d.toISOString().slice(0,10);};
 const shelfMonths=value=>{const m=String(value||"").match(/\d+/);return m?Number(m[0]):0;};
@@ -25,20 +28,38 @@ function saveSearchHistory(type,value){
   sessionStorage.setItem(MSL_SEARCH_HISTORY_KEY,JSON.stringify(rows.slice(0,8)));
 }
 function displayDate(value){if(!value)return"—";const d=new Date(value);return Number.isNaN(d.getTime())?esc(value):d.toLocaleString("th-TH",{dateStyle:"short",timeStyle:"short"});}
-function calcGeneralExpiry(mfgDate,profile){
+function calcGeneralExpiry(mfgDate,profile,inspectionDate=""){
   if(!mfgDate||!profile||profile.expiry_calculation_mode!=="FIXED_MONTHS"||!(Number(profile.shelf_life_months)>0))return null;
   const mfg=new Date(`${mfgDate}T12:00:00`); if(Number.isNaN(mfg.getTime()))return null;
-  const now=new Date(); if(mfg>now)return {error:"MFG_DATE_IN_FUTURE"};
+  const now=inspectionDate?new Date(`${inspectionDate}T12:00:00`):new Date();
+  if(Number.isNaN(now.getTime()))return {error:"INSPECTION_DATE_INVALID"};
+  if(mfg>now)return {error:"MFG_DATE_IN_FUTURE"};
   const expiry=addMonths(mfgDate,Number(profile.shelf_life_months));
-  const expDate=new Date(`${expiry}T23:59:59`);
+  const expDate=new Date(`${expiry}${inspectionDate?"T12:00:00":"T23:59:59"}`);
   const totalDays=Math.max(1,Math.ceil((new Date(`${expiry}T12:00:00`)-mfg)/86400000));
   const remainingDays=Math.ceil((expDate-now)/86400000);
-  const remainingPercent=Math.max(0,Math.min(100,Math.round((Math.max(0,remainingDays)/totalDays)*100)));
+  const remainingPercentExact=Math.max(0,Math.min(100,(Math.max(0,remainingDays)/totalDays)*100));
+  const remainingPercent=Math.round(remainingPercentExact);
   let status="VALID";
   if(remainingDays<0)status="EXPIRED";
   else if(remainingPercent<10)status="NEAR_EXPIRY";
   else if(remainingPercent<=30)status="EXPIRING_SOON";
-  return {expiry,remainingDays,remainingPercent,status};
+  return {expiry,remainingDays,remainingPercent,remainingPercentExact,status};
+}
+function evaluateIqcShelfLife(calc){
+  if(!calc||calc.error)return null;
+  const remainingPercent=Math.floor(calc.remainingPercentExact??calc.remainingPercent);
+  if(calc.remainingDays<0||calc.status==="EXPIRED")return {status:"EXPIRED",label:"EXPIRED — DO NOT USE",result:"FAIL",action:"HOLD / DO NOT USE",message:"Material has exceeded its shelf life.",remainingPercent,cls:"bad",icon:"✕"};
+  if((calc.remainingPercentExact??calc.remainingPercent)>=50)return {status:"ACCEPTABLE",label:"ACCEPTABLE",result:"PASS",action:"ACCEPT",message:"Meets requirement (≥ 50%)",remainingPercent,cls:"ok",icon:"✓"};
+  return {status:"BELOW_50_REQUIREMENT",label:"BELOW 50% REQUIREMENT",result:"FAIL / REVIEW",action:"HOLD / REVIEW REQUIRED",message:"Does not meet the minimum remaining shelf-life requirement (≥ 50%).",remainingPercent,cls:"warn",icon:"✕"};
+}
+function iqcShelfLifeResultHtml(calc){
+  const result=evaluateIqcShelfLife(calc);if(!result)return "";
+  return `<section class="iqc-result-card ${result.cls}" aria-live="polite">
+    <div class="iqc-result-head"><div><span>IQC SHELF-LIFE STATUS</span><b>${result.label}</b></div><strong>${result.result}</strong></div>
+    <div class="iqc-result-grid"><div><span>Expiry Date</span><b>${esc(calc.expiry)}</b></div><div><span>Remaining Days</span><b>${fmt(calc.remainingDays)} Days</b></div><div><span>Remaining Shelf Life</span><b>${result.remainingPercent}%</b></div><div><span>Requirement Result</span><b>${result.icon} ${esc(result.message)}</b></div></div>
+    <div class="iqc-action"><span>IQC ACTION</span><b>${result.action}</b></div>
+  </section>`;
 }
 function statusMeta(status){
   if(status==="VALID")return {label:"VALID",thai:"ใช้งานได้",cls:"ok",icon:"✓"};
@@ -137,10 +158,38 @@ function createDatabaseClient(token){
   );
 }
 
+function isRetryableLoadError(error){
+  const status=Number(error?.status||error?.statusCode||0);
+  const message=String(error?.message||"").toLowerCase();
+  if(status===401||status===403||(status>=400&&status<500&&status!==408&&status!==429))return false;
+  if(/jwt|permission denied|not authorized|invalid api key|config\.js/.test(message))return false;
+  return true;
+}
+const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+async function runWithRetry(operation,{delays=DASHBOARD_RETRY_DELAYS_MS,onRetry=()=>{}}={}){
+  let lastError;
+  for(let attempt=0;attempt<delays.length;attempt+=1){
+    if(attempt>0)await wait(delays[attempt]);
+    try{return await operation(attempt);}catch(error){
+      lastError=error;
+      if(attempt===delays.length-1||!isRetryableLoadError(error))throw error;
+      onRetry(attempt+1,delays.length-1,error);
+    }
+  }
+  throw lastError;
+}
+async function ensureAuthenticatedDatabaseClient(){
+  if(databaseReady)return;
+  if(!adminToken||!tokenIsValid(adminToken)||!sb)throw Object.assign(new Error("Authentication session is not ready"),{status:401});
+  const {error}=await sb.from("msl_material_groups").select("group_code",{head:true}).limit(1);
+  if(error)throw error;
+  databaseReady=true;
+}
+
 async function init(){
   if(adminToken && tokenIsValid(adminToken)){
     sb=createDatabaseClient(adminToken);
-    mount();
+    await mount();
   }else{
     sessionStorage.removeItem(TOKEN_KEY);
     adminToken="";
@@ -198,12 +247,12 @@ function login(){
     try{
       const response=await fetch("/.netlify/functions/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:$("#username").value.trim(),password:$("#password").value})});
       const result=await response.json();if(!response.ok||!result.ok)throw new Error(result.error||"Login failed");
-      adminToken=result.access_token;sessionStorage.setItem(TOKEN_KEY,adminToken);sb=createDatabaseClient(adminToken);mount();
+      adminToken=result.access_token;sessionStorage.setItem(TOKEN_KEY,adminToken);databaseReady=false;sb=createDatabaseClient(adminToken);await mount();
     }catch(error){console.error(error);err.textContent="ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง";}
     finally{button.disabled=false;button.innerHTML='Continue to Portal <span>→</span>';}
   };
 }
-function mount(){
+async function mount(){
   document.title="Material Shelf-Life & Storage Control System";
   app.innerHTML=`<div class="system-shell">
     <header class="system-header">
@@ -257,7 +306,7 @@ function mount(){
   $("#mobileMenu").onclick=()=>{$(".sidebar").classList.toggle("open");$(".nav-overlay").classList.toggle("show");};
   $(".nav-overlay").onclick=closeMobileNav;
   $$('[data-page]').forEach(b=>b.onclick=()=>{render(b.dataset.page);closeMobileNav();});
-  render("dashboard");
+  await render("dashboard");
 }
 async function render(name){
   const titles={dashboard:"Material Shelf-Life & Storage Control System",lookup:"Search / Lookup",incoming:"Incoming Check",warehouse:"Warehouse Check",alerts:"Expiry Alert",report:"Reports",master:"Master Data",settings:"Settings",receive:"Chemical Receiving",issue:"Chemical Issue",stock:"Chemical Stock",history:"Chemical Movement History",more:"Chemical Tools"};
@@ -270,7 +319,15 @@ async function render(name){
   if(["receive","issue","stock","history"].includes(name))$("#chemicalNav").open=true;
   const systemNav=$("#systemNav"); if(systemNav && ["report","master","settings"].includes(name))systemNav.open=true;
   $("#page").innerHTML='<div class="loading"><span class="spinner"></span>กำลังโหลด...</div>';
-  try{await ({dashboard,lookup,incoming,warehouse,alerts,report,master:masterData,settings,receive,issue,stock,history,more}[name]||dashboard)();}
+  const pageHandler=({dashboard,lookup,incoming,warehouse,alerts,report,master:masterData,settings,receive,issue,stock,history,more}[name]||dashboard);
+  try{
+    if(name==="dashboard"){
+      await runWithRetry(async()=>{await ensureAuthenticatedDatabaseClient();await pageHandler();},{onRetry:(attempt,maxAttempts)=>{$("#page").innerHTML=`<div class="loading"><span class="spinner"></span>กำลังเชื่อมต่อข้อมูล... ลองใหม่ ${attempt}/${maxAttempts}</div>`;}});
+    }else{
+      await ensureAuthenticatedDatabaseClient();
+      await pageHandler();
+    }
+  }
   catch(e){console.error(e);$("#page").innerHTML=`<div class="panel error-panel"><b>ไม่สามารถโหลดข้อมูลได้</b><div>${esc(e.message)}</div></div>`;}
 }
 async function getLots(){const {data,error}=await sb.from("chemical_lots").select("*,materials(*)").eq("is_active",true).order("received_date");if(error)throw error;return data||[];}
@@ -584,9 +641,9 @@ function renderGroupLookup(g){
 }
 
 async function incoming(){
-  $("#page").innerHTML=`<div class="page-intro"><div><h2>General Material Incoming Check</h2><p>ตรวจสอบ Material Group, Shelf Life และ Storage Requirement โดยไม่สร้าง Receiving/Stock ซ้ำกับ WMS</p></div><button class="secondary" data-go="receive">เปิด Chemical Receiving</button></div><section class="panel"><div class="panel-head"><div><span class="panel-icon">▣</span><b>Lookup / Verification</b></div><span class="chip">NO STOCK TRANSACTION</span></div><div class="verify-search"><input id="incomingCode" placeholder="Material Code"><input id="incomingMfg" type="date" title="Manufacturing Date / Date Code"><button id="incomingCheck" class="primary">Check</button></div><div id="incomingResult" class="result-space"><div class="empty-state">กรอก Material Code เพื่อเริ่มตรวจสอบ</div></div></section>`;bindGo();
-  const run=async()=>{const code=normalizeCode($("#incomingCode").value);if(!code)return;try{const r=await mslLookupCode(code);if(!r?.found){$("#incomingResult").innerHTML=`<div class="notice danger"><b>MATERIAL_CODE_NOT_FOUND</b><span>${esc(code)} ไม่มี Mapping — ห้ามเดา Group</span></div>`;return;}const p=r.selected_profile,mfg=$("#incomingMfg").value,calc=calcGeneralExpiry(mfg,p);$("#incomingResult").innerHTML=`<div class="verification-result"><div class="detail-grid"><div><span>Material Code</span><b>${esc(r.material_code)}</b></div><div><span>Material Group</span><b>${esc(r.material_group)}</b></div><div><span>Profile Status</span><b>${esc(r.profile_selection_status)}</b></div><div><span>Requirement</span><b>${esc(r.requirement_status)}</b></div></div>${r.profile_verification_required?`<div class="notice warning"><b>PROFILE VERIFICATION REQUIRED</b><span>พบหลาย Storage Profiles — ยังไม่อนุญาตให้ระบบเลือกหรือคำนวณ Expiry</span></div><div class="profile-grid">${allProfilesHtml(r.storage_profiles)}</div>`:`${profileRows(p)}${calc&&!calc.error?`<div class="expiry-result ${statusMeta(calc.status).cls}"><b>${statusMeta(calc.status).label}</b><span>Expiry ${esc(calc.expiry)} • Remaining ${fmt(calc.remainingDays)} Days • ${calc.remainingPercent}%</span></div>`:(mfg?'<div class="notice danger">MFG Date ไม่ถูกต้องหรือไม่สามารถคำนวณได้</div>':'<div class="notice info">กรอก MFG Date เพื่อคำนวณ Expiry</div>')}`}</div>`;}catch(e){$("#incomingResult").innerHTML=`<div class="notice danger">${esc(e.message)}</div>`;}};
-  $("#incomingCheck").onclick=run;$("#incomingCode").onkeydown=e=>{if(e.key==="Enter")run();};
+  $("#page").innerHTML=`<div class="page-intro"><div><h2>General Material Incoming Check</h2><p>ตรวจสอบ Material Group, Shelf Life และ Storage Requirement โดยไม่สร้าง Receiving/Stock ซ้ำกับ WMS</p></div><button class="secondary" data-go="receive">เปิด Chemical Receiving</button></div><section class="panel"><div class="panel-head"><div><span class="panel-icon">▣</span><b>Lookup / Verification</b></div><span class="chip">NO STOCK TRANSACTION</span></div><div class="iqc-requirement"><b>IQC Requirement</b><span>The remaining shelf life of the material must be at least 50% of the specified shelf-life period.</span></div><div class="verify-search incoming-check-search"><label>Material Code<input id="incomingCode" placeholder="Material Code"></label><label>MFG Date<input id="incomingMfg" type="date" title="Manufacturing Date / Date Code"></label><label>Inspection Date<input id="incomingInspection" type="date" value="${localToday()}" title="Current / Inspection Date"></label><button id="incomingCheck" class="primary">Check</button></div><div id="incomingResult" class="result-space"><div class="empty-state">กรอก Material Code เพื่อเริ่มตรวจสอบ</div></div></section>`;bindGo();
+  const run=async()=>{const code=normalizeCode($("#incomingCode").value);if(!code)return;try{const r=await mslLookupCode(code);if(!r?.found){$("#incomingResult").innerHTML=`<div class="notice danger"><b>MATERIAL_CODE_NOT_FOUND</b><span>${esc(code)} ไม่มี Mapping — ห้ามเดา Group</span></div>`;return;}const p=r.selected_profile,mfg=$("#incomingMfg").value,inspectionDate=$("#incomingInspection").value,calc=calcGeneralExpiry(mfg,p,inspectionDate);$("#incomingResult").innerHTML=`<div class="verification-result"><div class="detail-grid"><div><span>Material Code</span><b>${esc(r.material_code)}</b></div><div><span>Material Group</span><b>${esc(r.material_group)}</b></div><div><span>Profile Status</span><b>${esc(r.profile_selection_status)}</b></div><div><span>Master Requirement</span><b>${esc(r.requirement_status)}</b></div></div>${r.profile_verification_required?`<div class="notice warning"><b>PROFILE VERIFICATION REQUIRED</b><span>พบหลาย Storage Profiles — ยังไม่อนุญาตให้ระบบเลือกหรือคำนวณ Expiry</span></div><div class="profile-grid">${allProfilesHtml(r.storage_profiles)}</div>`:`${profileRows(p)}${calc&&!calc.error?iqcShelfLifeResultHtml(calc):(mfg?'<div class="notice danger">MFG Date / Inspection Date ไม่ถูกต้องหรือไม่สามารถคำนวณได้</div>':'<div class="notice info">กรอก MFG Date เพื่อคำนวณ Expiry</div>')}`}</div>`;}catch(e){$("#incomingResult").innerHTML=`<div class="notice danger">${esc(e.message)}</div>`;}};
+  $("#incomingCheck").onclick=run;$("#incomingCode").onkeydown=e=>{if(e.key==="Enter")run();};$("#incomingMfg").onchange=()=>{if($("#incomingCode").value.trim())run();};$("#incomingInspection").onchange=()=>{if($("#incomingCode").value.trim()&&$("#incomingMfg").value)run();};
 }
 
 async function notifyGeneralMaterialDingTalk(payload){
@@ -665,7 +722,7 @@ async function masterData(){
 
 async function settings(){
   $("#page").innerHTML=`<div class="settings-grid"><section class="panel"><div class="panel-head"><div><span class="panel-icon">⚙</span><b>System Configuration</b></div></div><div class="setting-row"><span>System</span><b>Material Shelf-Life & Storage Control</b></div><div class="setting-row"><span>Database</span><b>Existing Chemical Supabase Project</b></div><div class="setting-row"><span>General Material</span><b>Read-only Lookup / Verification</b></div><div class="setting-row"><span>Chemical Material</span><b>Existing Tracking + Alert Flow</b></div><div class="setting-row"><span>Reference</span><b>TH-MM-R-007-2025</b></div></section><section class="panel"><div class="panel-head"><div><span class="panel-icon">✓</span><b>Production Guardrails</b></div></div><div class="check-list"><span>✓ No fake/demo material data</span><span>✓ No General Material stock creation</span><span>✓ No WMS duplicate transaction</span><span>✓ Missing mapping = Not Found</span><span>✓ Multiple profiles = Verification Required</span><span>✓ Chemical tables and DingTalk flow preserved</span></div><button id="settingsLogout" class="danger ghost-danger">ออกจากระบบ</button></section></div>`;
-  $("#settingsLogout").onclick=()=>{sessionStorage.removeItem(TOKEN_KEY);adminToken="";sb=null;login();};
+  $("#settingsLogout").onclick=()=>{sessionStorage.removeItem(TOKEN_KEY);adminToken="";sb=null;databaseReady=false;login();};
 }
 
 async function more(){
@@ -674,5 +731,6 @@ async function more(){
 async function importBom(e){const file=e.target.files[0];if(!file)return;const wb=XLSX.read(await file.arrayBuffer()),rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:""});const pick=(r,names)=>{for(const n of names){const k=Object.keys(r).find(x=>x.trim().toLowerCase()===n.toLowerCase());if(k)return r[k]}return""};const list=rows.map(r=>({material_code:String(pick(r,["Material Code","Material","Code","รหัสวัสดุ"])).trim(),material_name:String(pick(r,["Material Name","Name","Description","ชื่อวัสดุ"])).trim(),unit:String(pick(r,["Unit","UOM","หน่วย"])).trim(),supplier:String(pick(r,["Supplier","ผู้ขาย"])).trim(),barcode:String(pick(r,["Barcode","บาร์โค้ด"])).trim()||null})).filter(x=>x.material_code&&x.material_name);const {error}=await sb.from("materials").upsert(list,{onConflict:"material_code"});if(error)throw error;alert(`Import BOM สำเร็จ ${list.length} รายการ`);}
 function bindGo(){$$("[data-go]").forEach(b=>b.onclick=()=>{render(b.dataset.go);closeMobileNav();});}
 async function scan(id,cb){const q=new Html5Qrcode(id);try{await q.start({facingMode:"environment"},{fps:10,qrbox:{width:240,height:120}},async t=>{cb(t.trim());await q.stop();$("#"+id).innerHTML="";});}catch(e){alert("เปิดกล้องไม่ได้: "+e.message);}}
-init();
+if(window.__MSL_DISABLE_AUTO_INIT__){window.__MSL_TEST_HOOKS__={calcGeneralExpiry,evaluateIqcShelfLife,iqcShelfLifeResultHtml,isRetryableLoadError,runWithRetry};}
+else{init();}
 })();
