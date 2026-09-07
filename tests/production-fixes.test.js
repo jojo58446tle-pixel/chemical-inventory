@@ -70,3 +70,35 @@ test("IQC result card includes every required production field",()=>{
     assert.ok(html.includes(text),`missing ${text}`);
   }
 });
+
+test("dashboard KPIs count only active valid mappings and distinct mapped groups",()=>{
+  const materialRows=[
+    {material_code:"MAT-001",group_code:"GROUP-A",is_active:true},
+    {material_code:"MAT-002",group_code:"GROUP-A",is_active:true},
+    {material_code:"MAT-003",group_code:"GROUP-B",is_active:true},
+    {material_code:"MAT-004",group_code:"GROUP-INACTIVE",is_active:true},
+    {material_code:"MAT-005",group_code:"GROUP-B",is_active:false}
+  ];
+  const groupRows=[
+    {group_code:"GROUP-A",is_active:true},
+    {group_code:"GROUP-B",is_active:true},
+    {group_code:"GROUP-INACTIVE",is_active:false}
+  ];
+  const result=hooks.calculateDashboardKpis(materialRows,groupRows);
+  assert.equal(result.materialCodes,3);
+  assert.equal(result.mappedGroups,2);
+});
+
+test("dashboard source contains only the two requested KPI cards",()=>{
+  const source=fs.readFileSync("app.js","utf8");
+  const dashboardBlock=source.slice(source.indexOf("async function dashboard()"),source.indexOf("async function receive()"));
+  assert.equal((dashboardBlock.match(/<article class="dashboard-stat/g)||[]).length,2);
+  assert.ok(dashboardBlock.includes("Material Codes"));
+  assert.ok(dashboardBlock.includes("Mapped Groups"));
+  assert.ok(dashboardBlock.includes("Used by Current Material Codes"));
+  assert.ok(!dashboardBlock.includes("Data Attention"));
+  assert.ok(!dashboardBlock.includes("counts.groups"));
+  const css=fs.readFileSync("styles.css","utf8");
+  assert.ok(!css.includes(".dashboard-metrics-clean{grid-template-columns:repeat(3"));
+  assert.ok(css.includes(".dashboard-metrics-clean{grid-template-columns:repeat(2"));
+});

@@ -103,6 +103,12 @@ Version: **1.0.0**
 - IQC outcomes: ACCEPTABLE / PASS, BELOW 50% REQUIREMENT / FAIL-REVIEW, and EXPIRED — DO NOT USE / FAIL.
 - Existing Material Master, Storage Requirement, Chemical Inventory, and database schema are unchanged.
 
+## V2.6 — Dashboard Master KPI Simplification
+- Dashboard now displays only Material Codes and Mapped Groups.
+- Material Codes is calculated from active, valid Production Master mappings.
+- Mapped Groups is calculated from distinct active group codes referenced by those mappings, not from the broader Shelf-Life & Storage Master.
+- Data Attention remains available to Master Data/report logic and is removed only from the main Dashboard.
+
 
 ## UI Refinement V1.1
 - Split-screen production login based on supplied reference style.

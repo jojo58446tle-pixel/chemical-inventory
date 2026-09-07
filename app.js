@@ -88,6 +88,31 @@ async function getMslCounts(){
   ]);
   return {groups,codes,profiles,rules,issues};
 }
+async function getActiveMasterRows(table,columns,orderColumn){
+  const pageSize=1000,rows=[];
+  for(let from=0;;from+=pageSize){
+    const {data,error}=await sb.from(table).select(columns).eq("is_active",true).order(orderColumn).range(from,from+pageSize-1);
+    if(error)throw error;
+    rows.push(...(data||[]));
+    if((data||[]).length<pageSize)break;
+  }
+  return rows;
+}
+function calculateDashboardKpis(materialRows=[],groupRows=[]){
+  const activeGroups=new Set(groupRows.filter(row=>row?.is_active!==false&&normalizeCode(row?.group_code)).map(row=>normalizeCode(row.group_code)));
+  const activeMappings=materialRows.filter(row=>row?.is_active!==false&&normalizeCode(row?.material_code)&&normalizeCode(row?.group_code)&&activeGroups.has(normalizeCode(row.group_code)));
+  return {
+    materialCodes:new Set(activeMappings.map(row=>normalizeCode(row.material_code))).size,
+    mappedGroups:new Set(activeMappings.map(row=>normalizeCode(row.group_code))).size
+  };
+}
+async function getDashboardKpis(){
+  const [materialRows,groupRows]=await Promise.all([
+    getActiveMasterRows("msl_material_codes","material_code,group_code,is_active","material_code"),
+    getActiveMasterRows("msl_material_groups","group_code,is_active","group_code")
+  ]);
+  return calculateDashboardKpis(materialRows,groupRows);
+}
 function navIcon(name){return ({dashboard:"⌂",lookup:"⌕",incoming:"▣",warehouse:"▤",alerts:"♢",report:"▦",master:"☷",settings:"⚙",receive:"⇩",issue:"⇧",stock:"▣",history:"↻"}[name]||"•");}
 function closeMobileNav(){document.querySelector(".sidebar")?.classList.remove("open");document.querySelector(".nav-overlay")?.classList.remove("show");}
 function setPage(name){render(name);}
@@ -333,7 +358,7 @@ async function render(name){
 async function getLots(){const {data,error}=await sb.from("chemical_lots").select("*,materials(*)").eq("is_active",true).order("received_date");if(error)throw error;return data||[];}
 function lotCard(l){const d=daysLeft(l.expiry_date),c=d<0||d<=30?"red":d<=180?"orange":"green";return `<div class="item"><div class="row"><div><b>${esc(l.materials?.material_code)} — ${esc(l.materials?.material_name)}</b><div class="muted">Lot ${esc(l.lot_no)}</div></div><span class="badge ${c}">${d<0?`หมดอายุ ${Math.abs(d)} วัน`:`เหลือ ${d} วัน`}</span></div><div class="row"><span>คงเหลือ ${fmt(l.remaining_qty)} ${esc(l.unit||l.materials?.unit)}</span><span>Exp ${esc(l.expiry_date)}</span></div></div>`;}
 async function dashboard(){
-  const [counts,lots]=await Promise.all([getMslCounts(),getLots()]);
+  const [kpis,lots]=await Promise.all([getDashboardKpis(),getLots()]);
   const active=lots.filter(x=>+x.remaining_qty>0),near=active.filter(x=>daysLeft(x.expiry_date)<=180&&daysLeft(x.expiry_date)>=0),expired=active.filter(x=>daysLeft(x.expiry_date)<0);
   $("#page").innerHTML=`
     <section class="dashboard-overview">
@@ -342,9 +367,8 @@ async function dashboard(){
     </section>
 
     <div class="dashboard-metrics-clean">
-      <article class="dashboard-stat"><span class="stat-icon">▣</span><div><small>Material Codes</small><b>${fmt(counts.codes)}</b><p>Mapped in Production Master</p></div></article>
-      <article class="dashboard-stat"><span class="stat-icon">☷</span><div><small>Material Groups</small><b>${fmt(counts.groups)}</b><p>Shelf-Life &amp; Storage Master</p></div></article>
-      <article class="dashboard-stat ${counts.issues?"needs-attention":""}"><span class="stat-icon">!</span><div><small>Data Attention</small><b>${fmt(counts.issues)}</b><p>${counts.issues?"รายการที่ต้องตรวจสอบ Master":"Master data ready"}</p></div></article>
+      <article class="dashboard-stat"><span class="stat-icon">▣</span><div><small>Material Codes</small><b>${fmt(kpis.materialCodes)}</b><p>Mapped in Production Master</p></div></article>
+      <article class="dashboard-stat"><span class="stat-icon">☷</span><div><small>Mapped Groups</small><b>${fmt(kpis.mappedGroups)}</b><p>Used by Current Material Codes</p></div></article>
     </div>
 
     <div class="dashboard-main-grid">
@@ -731,6 +755,6 @@ async function more(){
 async function importBom(e){const file=e.target.files[0];if(!file)return;const wb=XLSX.read(await file.arrayBuffer()),rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:""});const pick=(r,names)=>{for(const n of names){const k=Object.keys(r).find(x=>x.trim().toLowerCase()===n.toLowerCase());if(k)return r[k]}return""};const list=rows.map(r=>({material_code:String(pick(r,["Material Code","Material","Code","รหัสวัสดุ"])).trim(),material_name:String(pick(r,["Material Name","Name","Description","ชื่อวัสดุ"])).trim(),unit:String(pick(r,["Unit","UOM","หน่วย"])).trim(),supplier:String(pick(r,["Supplier","ผู้ขาย"])).trim(),barcode:String(pick(r,["Barcode","บาร์โค้ด"])).trim()||null})).filter(x=>x.material_code&&x.material_name);const {error}=await sb.from("materials").upsert(list,{onConflict:"material_code"});if(error)throw error;alert(`Import BOM สำเร็จ ${list.length} รายการ`);}
 function bindGo(){$$("[data-go]").forEach(b=>b.onclick=()=>{render(b.dataset.go);closeMobileNav();});}
 async function scan(id,cb){const q=new Html5Qrcode(id);try{await q.start({facingMode:"environment"},{fps:10,qrbox:{width:240,height:120}},async t=>{cb(t.trim());await q.stop();$("#"+id).innerHTML="";});}catch(e){alert("เปิดกล้องไม่ได้: "+e.message);}}
-if(window.__MSL_DISABLE_AUTO_INIT__){window.__MSL_TEST_HOOKS__={calcGeneralExpiry,evaluateIqcShelfLife,iqcShelfLifeResultHtml,isRetryableLoadError,runWithRetry};}
+if(window.__MSL_DISABLE_AUTO_INIT__){window.__MSL_TEST_HOOKS__={calcGeneralExpiry,evaluateIqcShelfLife,iqcShelfLifeResultHtml,isRetryableLoadError,runWithRetry,calculateDashboardKpis};}
 else{init();}
 })();
